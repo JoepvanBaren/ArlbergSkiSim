@@ -7,8 +7,8 @@
   function syncWorld() {
     Object.keys(Wd.liftVis).forEach(function (id) { Wd.removeLift(id); });
     SK.G.lifts.forEach(function (l) { Wd.addLift(l); });
-    Wd.setVillageLevel(SK.G.villageLevel);
-    Wd.redrawPistes(); Wd.rebuildHuts(); Wd.rebuildTrees();
+    Sim.syncVillages();
+    Wd.redrawPistes();
   }
   function enterSummer() {
     B.sel = null;

@@ -9,25 +9,57 @@ window.SK = window.SK || {};
     SEASON_DAYS: 120,          // Dec 1 .. Mar 30
     DAY_SEC: 1.2,              // real seconds per game day at 1x
     SNAP: 110,                 // metres: endpoints closer than this connect
-    HUB_RADIUS: 380,           // metres: valley station zone around a village
+    HUB_RADIUS: 360,           // metres: valley station zone around a village
     MAX_AGENTS: 1300,
+    // lighter graphics on phones; force with ?low=1 or ?high=1 in the address
+    LOW: /low=1/.test(location.search) || (!/high=1/.test(location.search) && (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || Math.min(window.screen.width, window.screen.height) < 600)),
     BASE_CREW_WEEKS: 24,
     TREELINE: 1960,
   };
 
-  // Real places, positioned by latitude / longitude
+  // Communities own the beds; hubs are the valley-station zones guests start from.
+  // bedsMax ~ guest beds today. Village buildings and streets come from OpenStreetMap and are revealed as a community develops.
+  SK.COMMUNITIES = [
+    { id: 'anton', name: 'St. Anton', bedsMax: 10500, train: 220 },
+    { id: 'christoph', name: 'St. Christoph', bedsMax: 700 },
+    { id: 'stuben', name: 'Stuben', bedsMax: 750 },
+    { id: 'zuers', name: 'Zürs', bedsMax: 1900, flexen: true },
+    { id: 'lech', name: 'Lech', bedsMax: 7200, flexen: true },
+    { id: 'warth', name: 'Warth', bedsMax: 2400, flexen: true },
+    { id: 'schroecken', name: 'Schröcken', bedsMax: 900 },
+  ];
+  SK.VILLAGE_FRAC = [0.08, 0.15, 0.25, 0.37, 0.5, 0.63, 0.76, 0.88, 1.0];
+  SK.VILLAGE_CAP = [[1937, 2], [1952, 3], [1963, 4], [1973, 5], [1984, 6], [1996, 7], [2008, 8]];   // real-world pace of development
+
   SK.PLACES = [
-    { name: 'St. Anton', lat: 47.1287, lon: 10.2670, kind: 'village', hub: true, weight: 0.62, houses: 150 },
-    { name: 'Nasserein', lat: 47.1345, lon: 10.2820, kind: 'village', hub: true, weight: 0.22, houses: 45 },
-    { name: 'St. Christoph', lat: 47.1283, lon: 10.2135, kind: 'village', hub: true, weight: 0.16, houses: 14 },
-    { name: 'St. Jakob', lat: 47.1410, lon: 10.3000, kind: 'village', hub: false, houses: 35 },
+    { name: 'St. Anton', osm: 'St. Anton am Arlberg', lat: 47.1287, lon: 10.2670, kind: 'village', hub: true, com: 'anton', weight: 0.7 },
+    { name: 'Nasserein', lat: 47.1345, lon: 10.2820, kind: 'village', hub: true, com: 'anton', weight: 0.3 },
+    { name: 'St. Jakob', osm: 'Sankt Jakob am Arlberg', lat: 47.1410, lon: 10.3000, kind: 'village', com: 'anton' },
+    { name: 'St. Christoph', osm: 'St. Christoph', lat: 47.1283, lon: 10.2135, kind: 'village', hub: true, com: 'christoph', weight: 1 },
+    { name: 'Stuben', osm: 'Stuben', lat: 47.1367, lon: 10.1617, kind: 'village', hub: true, com: 'stuben', weight: 1 },
+    { name: 'Zürs', lat: 47.1700, lon: 10.1633, kind: 'village', hub: true, com: 'zuers', weight: 1 },
+    { name: 'Lech', lat: 47.2083, lon: 10.1417, kind: 'village', hub: true, com: 'lech', weight: 0.65 },
+    { name: 'Oberlech', lat: 47.2117, lon: 10.1283, kind: 'village', hub: true, com: 'lech', weight: 0.2 },
+    { name: 'Zug', lat: 47.1960, lon: 10.1080, kind: 'village', hub: true, com: 'lech', weight: 0.15 },
+    { name: 'Warth', lat: 47.2583, lon: 10.1833, kind: 'village', hub: true, com: 'warth', weight: 1 },
+    { name: 'Schröcken', lat: 47.2583, lon: 10.0917, kind: 'village', hub: true, com: 'schroecken', weight: 1 },
+    { name: 'Langen', osm: 'Langen am Arlberg', lat: 47.1320, lon: 10.1220, kind: 'area' },
     { name: 'Valluga', lat: 47.1576, lon: 10.2131, kind: 'peak' },
     { name: 'Weißschrofenspitze', lat: 47.1560, lon: 10.2468, kind: 'peak' },
+    { name: 'Trittkopf', lat: 47.1549, lon: 10.1923, kind: 'peak' },
+    { name: 'Rüfikopf', lat: 47.2010, lon: 10.1697, kind: 'peak' },
+    { name: 'Omeshorn', lat: 47.1860, lon: 10.1281, kind: 'peak' },
+    { name: 'Hasenfluh', lat: 47.1682, lon: 10.1392, kind: 'peak' },
+    { name: 'Kriegerhorn', lat: 47.2136, lon: 10.1121, kind: 'peak' },
+    { name: 'Mohnenfluh', lat: 47.2324, lon: 10.1021, kind: 'peak' },
+    { name: 'Karhorn', lat: 47.2478, lon: 10.1517, kind: 'peak' },
+    { name: 'Saloberkopf', lat: 47.2573, lon: 10.1366, kind: 'peak' },
     { name: 'Galzig', lat: 47.1344, lon: 10.2237, kind: 'peak' },
     { name: 'Kapall', lat: 47.1478, lon: 10.2497, kind: 'peak' },
     { name: 'Gampen', lat: 47.1392, lon: 10.2553, kind: 'area' },
     { name: 'Rendl', lat: 47.1108, lon: 10.2480, kind: 'area' },
-    { name: 'Moostal', lat: 47.1010, lon: 10.2760, kind: 'area' },
+    { name: 'Albona', lat: 47.1180, lon: 10.1650, kind: 'area' },
+    { name: 'Flexenpass', lat: 47.1583, lon: 10.1650, kind: 'area' },
     { name: 'Verwall', lat: 47.0960, lon: 10.2180, kind: 'area' },
   ];
 
@@ -71,7 +103,34 @@ window.SK = window.SK || {};
       blurb: 'Self-driving pods on a fixed rail of light. No queue to speak of.' },
   ];
   SK.LIFT = {};
-  SK.LIFTS.forEach(function (l) { SK.LIFT[l.id] = l; });
+  var CREW = { tbar: 2, tram: 4, single: 2, double: 3, gondola4: 5, quad: 4, gondola8: 6, six: 4, funitel: 7, eight: 5, s3: 8, pod: 3 };
+  var WINDMAX = { tbar: 95, tram: 70, single: 50, double: 55, gondola4: 60, quad: 65, gondola8: 70, six: 72, funitel: 105, eight: 75, s3: 110, pod: 120 };
+  SK.LIFTS.forEach(function (l) { SK.LIFT[l.id] = l; l.crew = CREW[l.id]; l.windMax = WINDMAX[l.id]; l.op = Math.round(l.op * 0.55); });
+
+  // Seasonal staff (wages in today's money, scaled by the era)
+  SK.STAFF = [
+    { id: 'mech', name: 'Lift mechanics', wage: 30000, desc: 'Keep sheaves, grips and ropes in shape. One looks after about four lifts and shortens every breakdown.' },
+    { id: 'patrol', name: 'Ski patrol', wage: 24000, desc: 'Mark, close, rescue - and blast avalanches once you have the charges. One per 8 km of piste.' },
+    { id: 'groom', name: 'Piste crew', wage: 22000, desc: 'Prepare the slopes every night: one per 5 km by boot and shovel, one per 14 km with snowcats.' },
+  ];
+  SK.LIFTIE_WAGE = 20000;
+  SK.CREW_LEVELS = [{ name: 'Skeleton crew', f: 0.6, thr: 0.86, wear: 1.35 }, { name: 'Standard crew', f: 1, thr: 1, wear: 1 }, { name: 'Full crew', f: 1.45, thr: 1.07, wear: 0.8 }];
+  SK.WAGE_ERA = [[1937, 0.22], [1955, 0.35], [1975, 0.65], [1995, 0.9], [2015, 1]];
+
+  // Warming relative to the 1930s (degrees C) - drives the freezing level
+  SK.WARMING = [[1937, 0], [1975, 0.2], [1990, 0.8], [2005, 1.4], [2020, 2.0], [2035, 2.8], [2050, 3.6], [2070, 4.6]];
+
+  // Valley projects: real milestones of the Arlberg the player can push through
+  SK.PROJECTS = [
+    { id: 'galleries', com: 'lech', year: 1950, cost: 800000, name: 'Flexen road avalanche galleries', desc: 'Zürs, Lech and Warth stay reachable when the avalanche danger is high. Without them the road shuts and half the guests stay away on those days.' },
+    { id: 'skibus', com: null, year: 1968, cost: 500000, name: 'Ski bus network', desc: 'Guests sleeping in a village without a lift ride the bus to the next valley station (70% of them come).' },
+    { id: 'parking', com: 'anton', year: 1978, cost: 1500000, name: 'Valley car parks', desc: 'The road tunnel brings day guests - if they can park. +2,000 day guests in St. Anton.' },
+    { id: 'pedestrian', com: 'anton', year: 1984, cost: 1200000, name: 'Pedestrian zone', desc: 'Cars leave the village centre of St. Anton. Guests rate their stay higher.' },
+    { id: 'garage', com: 'lech', year: 1988, cost: 4000000, name: 'Underground car park Lech', desc: '+1,500 day guests in Lech without a sea of cars.' },
+    { id: 'tunnels', com: 'lech', year: 1994, cost: 5000000, name: 'Oberlech tunnel system', desc: 'Deliveries go underground and Oberlech becomes car-free. Guests rate their stay higher.' },
+    { id: 'station', com: 'anton', year: 1999, cost: 9000000, name: 'Move the railway, new station', desc: 'As in 2000: the tracks move to the south side of the valley. +2,500 day guests by train.' },
+    { id: 'hall', com: 'anton', year: 2000, cost: 6000000, name: 'Congress & wellness hall', desc: 'Something to do when the lifts stand still: storm days hurt satisfaction far less.' },
+  ];
 
   // One-time upgrades
   SK.TECH = [
@@ -80,12 +139,15 @@ window.SK = window.SK || {};
     { id: 'prefab', name: 'Modular stations', year: 1995, cost: 2500000, group: 'Construction', desc: '+16 crew-weeks. Stations arrive pre-built.' },
     { id: 'snowcat', name: 'Snowcat grooming', year: 1960, cost: 220000, group: 'Slopes', desc: 'Corduroy every morning. Guests are happier, beginners especially.' },
     { id: 'winch', name: 'Winch groomers', year: 1990, cost: 1500000, group: 'Slopes', desc: 'Even black runs get groomed. More satisfaction on steep slopes.' },
-    { id: 'snow1', name: 'Snow cannons', year: 1975, cost: 600000, group: 'Snow', desc: 'Unlocks snowmaking on pistes: they stay open up to 450 m below the snowline.' },
-    { id: 'snow2', name: 'Automated snow lances', year: 1996, cost: 3500000, group: 'Snow', desc: 'Snowmaking works 750 m below the snowline and costs 30% less to run.' },
-    { id: 'snow3', name: 'All-weather snow factory', year: 2022, cost: 12000000, group: 'Snow', desc: 'Snow at plus degrees. Snowmaking works 1100 m below the snowline.' },
+    { id: 'snow1', name: 'Snow cannons', year: 1975, cost: 600000, group: 'Snow', desc: 'Unlocks snowmaking on pistes. The cannons need about -4 degrees to run.' },
+    { id: 'snow2', name: 'Automated snow lances', year: 1996, cost: 3500000, group: 'Snow', desc: 'Snow from -2 degrees, almost twice as fast, and 30% cheaper to run.' },
+    { id: 'snow3', name: 'All-weather snow factory', year: 2022, cost: 12000000, group: 'Snow', desc: 'Makes snow even at plus degrees - slowly and at a price.' },
     { id: 'keycard', name: 'Magnetic key cards', year: 1985, cost: 700000, group: 'Tickets', desc: 'Faster gates: +8% lift throughput.' },
     { id: 'rfid', name: 'Hands-free RFID gates', year: 2003, cost: 2800000, group: 'Tickets', desc: 'Another +10% lift throughput, and guest data for marketing.' },
     { id: 'dynprice', name: 'Dynamic pricing', year: 2024, cost: 4000000, group: 'Tickets', desc: '+9% ticket revenue from demand-based prices.' },
+    { id: 'ava1', name: 'Avalanche commission & hand charges', year: 1948, cost: 120000, group: 'Safety', desc: 'Your ski patrol blasts threatened slopes before opening: each patroller secures three pistes on a danger day.' },
+    { id: 'forecast', name: 'Weather station network', year: 1970, cost: 350000, group: 'Safety', desc: 'Avalanche bulletin and wind forecast three days ahead - time to close what needs closing.' },
+    { id: 'ava2', name: 'Remote blasting masts', year: 1992, cost: 3000000, group: 'Safety', desc: 'Fixed masts fire at the push of a button. Every piste and lift is secured, whatever the weather.' },
   ];
   SK.TECHMAP = {};
   SK.TECH.forEach(function (t) { SK.TECHMAP[t.id] = t; });
@@ -103,23 +165,13 @@ window.SK = window.SK || {};
     { id: 'social', name: 'Social media & creators', year: 2010, cost: 500000, scale: 1, aw: 0.20, desc: 'Drone shots at sunrise, shared a million times.' },
   ];
 
-  // Village lodging tiers (simple stand-in for hotels / restaurants / bars)
-  SK.VILLAGE = [
-    { beds: 450, cost: 0 }, { beds: 900, cost: 120000 }, { beds: 1800, cost: 350000 }, { beds: 3200, cost: 900000 },
-    { beds: 5000, cost: 2200000 }, { beds: 7500, cost: 5000000 }, { beds: 10500, cost: 10000000 },
-    { beds: 14000, cost: 18000000 }, { beds: 18000, cost: 30000000 }, { beds: 23000, cost: 45000000 },
-  ];
-
   // Regional skier market (potential guests per day across all nearby resorts)
-  SK.MARKET = [[1937, 1900], [1946, 1500], [1950, 3600], [1960, 9500], [1970, 21000], [1980, 35000], [1990, 47000],
-    [2000, 57000], [2010, 63000], [2020, 65000], [2035, 61000], [2060, 52000]];
-
-  // Natural snowline (metres) that a typical mid-winter reaches down to. Rises with the climate.
-  SK.SNOWLINE = [[1937, 700], [1975, 800], [1988, 1000], [2000, 1200], [2010, 1380], [2020, 1560], [2030, 1760], [2040, 1960], [2060, 2300]];
+  SK.MARKET = [[1937, 2200], [1946, 1800], [1950, 4200], [1960, 11500], [1970, 26000], [1980, 44000], [1990, 60000],
+    [2000, 73000], [2010, 80000], [2020, 83000], [2035, 78000], [2060, 66000]];
 
   // Rival resorts: attractiveness over time
   SK.RIVALS = [
-    { id: 'lech', name: 'Lech-Zürs', curve: [[1937, 0.10], [1950, 0.14], [1965, 0.26], [1980, 0.40], [2000, 0.55], [2020, 0.63], [2060, 0.66]] },
+    { id: 'montafon', name: 'Montafon', curve: [[1937, 0.10], [1950, 0.14], [1965, 0.26], [1980, 0.40], [2000, 0.55], [2020, 0.63], [2060, 0.66]] },
     { id: 'ischgl', name: 'Ischgl', curve: [[1937, 0.0], [1962, 0.02], [1965, 0.10], [1980, 0.36], [2000, 0.62], [2020, 0.74], [2060, 0.78]] },
     { id: 'serfaus', name: 'Serfaus-Fiss', curve: [[1937, 0.02], [1960, 0.10], [1980, 0.30], [2000, 0.50], [2020, 0.64], [2060, 0.66]] },
     { id: 'sonnenkopf', name: 'Sonnenkopf', curve: [[1937, 0.0], [1970, 0.02], [1980, 0.10], [2000, 0.17], [2020, 0.20], [2060, 0.18]] },
@@ -133,11 +185,11 @@ window.SK = window.SK || {};
     1964: { title: 'Innsbruck Winter Olympics', text: 'The Games put Tyrol on every television screen. The regional market jumps this winter.', market: 1.18 },
     1973: { title: 'Oil crisis', text: 'Sunday driving bans and expensive fuel. Fewer day guests this winter.', market: 0.86 },
     1976: { title: 'Olympics return to Innsbruck', text: 'A second Olympic winter fills the valleys.', market: 1.14 },
-    1978: { title: 'Arlberg road tunnel opens', text: 'A 14 km tunnel makes the Arlberg winter-safe by car. Day guests can now reach you easily: +2,500 visitor capacity.', daytrip: 2500 },
-    1988: { title: 'A green Christmas', text: 'Almost no snow until January. Resorts with snow cannons smile; the rest pray.', snow: 500 },
-    1989: { title: 'Another poor winter', text: 'Two bad winters in a row. Snowmaking is no longer a luxury.', snow: 420 },
+    1978: { title: 'Arlberg road tunnel opens', text: 'A 14 km tunnel makes the Arlberg winter-safe by car. Day guests can now reach St. Anton easily: +1,500 a day, more once they can park.', daytrip: 1500 },
+    1988: { title: 'A green Christmas', text: 'Almost no snow until January. Resorts with snow cannons smile; the rest pray.', warm: 2.4 },
+    1989: { title: 'Another poor winter', text: 'Two bad winters in a row. Snowmaking is no longer a luxury.', warm: 2.0 },
     2001: { title: 'Alpine World Ski Championships', text: 'St. Anton hosts the world. If your reputation is 70 or better the event doubles as a giant advertisement.', wm: true },
-    2006: { title: 'The warmest winter on record', text: 'Rain to 2,000 m in January.', snow: 480 },
+    2006: { title: 'The warmest winter on record', text: 'Rain to 2,000 m in January.', warm: 2.6 },
     2020: { title: 'The closed winter', text: 'Travel restrictions keep foreign guests away. Only locals ski this season.', market: 0.3 },
     2030: { title: 'The snowline keeps climbing', text: 'Winters below 1,700 m are no longer reliable. Guests look for resorts that go high - or make their own snow.' },
   };
@@ -148,18 +200,20 @@ window.SK = window.SK || {};
       need: { visitors: 120 }, reward: 150000 },
     { id: 'g2', by: 1952, title: 'Post-war revival', text: 'Average 700 guests a day with at least 8 km of pistes.',
       need: { visitors: 700, km: 8 }, reward: 400000 },
+    { id: 'g2b', by: 1958, title: 'Over the pass', text: 'Bring lifts to three of the seven villages - Lech, Zürs and Stuben are waiting - and average 1,400 guests a day.',
+      need: { visitors: 1400, villages: 3 }, reward: 800000 },
     { id: 'g3', by: 1965, title: 'To the summits', text: 'Take guests above 2,600 m and average 2,000 guests a day.',
       need: { visitors: 2000, top: 2600 }, reward: 1500000 },
-    { id: 'g4', by: 1980, title: 'The boom years', text: 'Average 4,500 guests a day, 40 km of pistes and a reputation of 65.',
-      need: { visitors: 4500, km: 40, rep: 65 }, reward: 5000000 },
+    { id: 'g4', by: 1980, title: 'The boom years', text: 'Average 5,000 guests a day, 60 km of pistes, lifts in five villages and a reputation of 65.',
+      need: { visitors: 5000, km: 60, rep: 65, villages: 5 }, reward: 5000000 },
     { id: 'g5', by: 1995, title: 'Snow insurance', text: 'Keep 85% of your piste kilometres open across a whole winter and average 6,000 guests.',
       need: { visitors: 6000, open: 0.85 }, reward: 9000000 },
     { id: 'g6', by: 2001, title: 'World Championship stage', text: 'Reach a reputation of 78 and 30,000 guests per hour of lift capacity.',
       need: { rep: 78, pph: 30000 }, reward: 15000000 },
-    { id: 'g7', by: 2020, title: 'Number one', text: 'Hold the largest market share of all named rivals and average 9,000 guests a day.',
-      need: { visitors: 9000, first: true }, reward: 30000000 },
-    { id: 'g8', by: 2045, title: 'Above the snowline', text: 'The climate has changed. Still average 9,000 guests with 85% of pistes open and a reputation of 80.',
-      need: { visitors: 9000, open: 0.85, rep: 80 }, reward: 0 },
+    { id: 'g7', by: 2020, title: 'Number one', text: 'Hold the largest market share of all named rivals and average 11,000 guests a day.',
+      need: { visitors: 11000, first: true }, reward: 30000000 },
+    { id: 'g8', by: 2045, title: 'Above the snowline', text: 'The climate has changed. Still average 11,000 guests with 85% of pistes open and a reputation of 80.',
+      need: { visitors: 11000, open: 0.85, rep: 80 }, reward: 0 },
   ];
 
   SK.interp = function (curve, x) {
@@ -177,6 +231,7 @@ window.SK = window.SK || {};
     blue: { name: 'Blue', css: '#2b7fd6', rgb: [43, 127, 214] },
     red: { name: 'Red', css: '#dc3b34', rgb: [220, 59, 52] },
     black: { name: 'Black', css: '#22262b', rgb: [34, 38, 43] },
+    route: { name: 'Ski route', css: '#f08a1c', rgb: [240, 138, 28] },
   };
   SK.gradeOf = function (g) { return g <= 0.25 ? 'blue' : g <= 0.40 ? 'red' : 'black'; };
 

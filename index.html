@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arlberg Pioneers — build St. Anton from 1937 to the future</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Arlberg Pioneers — build the Arlberg from 1937 to the future</title>
 <style>
   :root {
     --ink: #16212c; --ink2: #5a6877; --ink3: #8e9aa7; --panel: rgba(255,255,255,0.93); --line: rgba(22,33,44,0.10);
@@ -37,7 +39,8 @@
   .logo { width: 34px; height: 34px; border-radius: 10px; background: var(--accent); display: grid; place-items: center; }
   .logo svg { width: 22px; height: 22px; }
   .brand .title { font-weight: 750; letter-spacing: 0.01em; font-size: 14px; }
-  .brand .sub { color: var(--ink2); font-size: 12px; }
+  .brand .sub { color: var(--ink2); font-size: 12px; white-space: nowrap; }
+  .brand .title { white-space: nowrap; }
   #stats { display: flex; padding: 4px 6px; flex: 0 1 auto; }
   .stat { padding: 5px 14px; border-right: 1px solid var(--line); min-width: 84px; }
   .stat:last-child { border-right: 0; }
@@ -166,6 +169,69 @@
   .steps b { display: block; color: var(--ink); margin-bottom: 2px; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #dfe9f2; z-index: 20; font-size: 15px; font-weight: 650; color: var(--ink2); }
   @media (max-width: 1100px) { .stat { min-width: 0; padding: 5px 9px; } .brand .title { display: none; } }
+
+  /* --- v2 additions --- */
+  html, body { position: fixed; inset: 0; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .maplabel.tag { font-size: 10.5px; background: rgba(255,255,255,0.9); border-radius: 7px; padding: 2px 6px; text-shadow: none; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
+  .maplabel.tag b { display: inline; font-weight: 650; }
+  .maplabel.pistetag b { color: #fff; border-radius: 5px; padding: 0 5px; margin-right: 2px; font-size: 10px; }
+  .pnum { display: inline-block; min-width: 18px; text-align: center; color: #fff; border-radius: 5px; padding: 0 4px; margin-right: 6px; font-size: 10.5px; }
+  .dng { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; color: #fff; font-style: normal; font-size: 12px; font-weight: 800; vertical-align: 1px; }
+  .cond { display: inline-block; width: 54px; height: 6px; border-radius: 6px; background: #e3e8ee; overflow: hidden; vertical-align: 1px; }
+  .cond i { display: block; height: 100%; border-radius: 6px; }
+  #plan .acts .lbl { align-self: center; color: var(--ink3); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+  .vcard { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
+  .vcard .vh { display: flex; justify-content: space-between; align-items: center; }
+  .vcard .vh b { font-size: 14px; cursor: pointer; }
+  .vcard .row2 { display: flex; gap: 12px; color: var(--ink2); margin: 4px 0 6px; font-variant-numeric: tabular-nums; }
+  .vcard .row2 b { color: var(--ink); }
+  .vcard .btn { margin-top: 8px; width: 100%; text-align: left; }
+  .pm { display: flex; align-items: center; gap: 6px; }
+  .pm b { min-width: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+  .pm .btn { width: 30px; padding: 6px 0; text-align: center; }
+  #sidebody .seg { flex-wrap: wrap; }
+  #sidebody .seg button { flex: 1; font-size: 11.5px; padding: 6px 4px; white-space: nowrap; }
+  .warnbox.calm { background: #eef3f8; border-color: #d5dfe9; color: #33475b; }
+  .warnbox b { font-weight: 700; }
+  .lcard.mode { flex: 0 0 250px; }
+  .lcard.mode .m { white-space: normal; }
+  #tabs button { font-size: 11.5px; }
+  #menuBtn { display: grid; place-items: center; padding: 0 14px; font-weight: 700; }
+  #menuBtn svg { width: 22px; height: 22px; }
+  body.side-closed #side { display: none; }
+  body.side-closed #views { width: auto; }
+  body.side-closed #bottom { right: 12px; }
+  #rotate { display: none; position: fixed; inset: 0; z-index: 30; background: #16212c; color: #fff; place-items: center; text-align: center; padding: 30px; font-size: 17px; font-weight: 650; }
+  #rotate svg { width: 64px; height: 64px; margin-bottom: 14px; }
+  @media (orientation: portrait) and (max-width: 700px) { #rotate { display: grid; } }
+
+  /* phones held sideways, small windows */
+  @media (max-height: 560px), (max-width: 900px) {
+    #topbar { top: 6px; left: 6px; right: 6px; gap: 5px; }
+    .brand { padding: 4px 8px 4px 5px; gap: 6px; } .logo { width: 26px; height: 26px; border-radius: 8px; } .logo svg { width: 16px; height: 16px; }
+    .brand .title { display: none; } .brand .sub { font-size: 10.5px; }
+    #stats { padding: 2px 3px; overflow-x: auto; scrollbar-width: none; }
+    .stat { padding: 3px 8px; min-width: 0; } .stat label { font-size: 8.5px; } .stat span { font-size: 13px; } .stat span small { font-size: 9.5px; }
+    #controls { padding: 3px; gap: 4px; } .cta { padding: 7px 10px; font-size: 12px; } .seg button { padding: 5px 7px; min-width: 28px; }
+    #menuBtn { padding: 0 10px; }
+    #seasonbar { top: 50px; left: 6px; right: 6px; }
+    #tools { left: 6px; top: 58px; padding: 3px; gap: 1px; }
+    #tools button { width: 46px; padding: 5px 0 3px; font-size: 9px; gap: 1px; } #tools button svg { width: 19px; height: 19px; }
+    #toasts { left: 62px; top: 58px; max-width: 46vw; } .toast { padding: 6px 9px; font-size: 11.5px; }
+    #side { right: 6px; top: 58px; bottom: 44px; width: min(330px, 62vw); }
+    #sidebody { padding: 8px 10px 12px; } #tabs { overflow-x: auto; scrollbar-width: none; } #tabs button { flex: 0 0 auto; padding: 7px 8px 8px; }
+    #views { right: 6px; bottom: 6px; width: min(330px, 62vw); padding: 3px; } #views button { padding: 5px 6px; font-size: 10.5px; }
+    #bottom { left: 62px; right: calc(min(330px, 62vw) + 14px); bottom: 6px; gap: 5px; }
+    body.side-closed #bottom { right: 220px; }
+    #plan { padding: 7px 10px; font-size: 12px; max-height: 42vh; overflow-y: auto; } #plan h4 { font-size: 12.5px; } #plan .row { gap: 9px; }
+    #tray { padding: 5px; gap: 5px; } .lcard { flex: 0 0 112px; padding: 5px 7px 6px; } .lcard svg { height: 30px; } .lcard .n { font-size: 11px; } .lcard .m, .lcard .p { font-size: 10px; }
+    .lcard.mode { flex: 0 0 190px; }
+    .btn { padding: 7px 10px; }
+    .sheet { padding: 16px 18px 14px; border-radius: 16px; } .sheet h1 { font-size: 20px; } .sheet p { font-size: 12.5px; margin-bottom: 6px; }
+    .sheet .grid { grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 8px 0; } .sheet .tile { padding: 6px 8px; } .sheet .tile b { font-size: 14px; }
+    .steps { gap: 5px; margin: 8px 0 2px; } .steps div { padding: 6px 9px; font-size: 11.5px; } .spark { height: 54px; }
+    .maplabel { font-size: 10px; } .maplabel.village b { font-size: 10.5px; }
+  }
 </style>
 </head>
 <body>
@@ -180,6 +246,7 @@
     <div class="card" id="stats"></div>
     <div class="spacer"></div>
     <div class="card" id="controls"></div>
+    <button class="card" id="menuBtn" title="Panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
   </div>
   <div id="seasonbar"><i></i></div>
   <div class="card" id="tools"></div>
@@ -193,9 +260,11 @@
 </div>
 <div id="modal" class="hidden"><div class="sheet" id="sheet"></div></div>
 <div id="loading">Surveying the Arlberg…</div>
+<div id="rotate"><div><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M2 9a9 9 0 0 1 3-5M2 9l-1-3M2 9l3-1"/></svg><br>Turn your phone sideways to play.</div></div>
 
 <script src="js/vendor/three.min.js"></script>
 <script src="data/terrain.js"></script>
+<script src="data/osm.js"></script>
 <script src="js/config.js"></script>
 <script src="js/terrain.js"></script>
 <script src="js/world.js"></script>

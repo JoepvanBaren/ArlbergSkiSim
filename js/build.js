@@ -2,7 +2,7 @@
 (function (SK) {
   'use strict';
   var T = SK.T, CFG = SK.CFG, Wd = SK.World, Sim = SK.Sim;
-  var B = SK.Build = { tool: 'inspect', liftType: 'tbar', start: null, pts: [], hover: null, sel: null, plan: null };
+  var B = SK.Build = { tool: 'inspect', liftType: 'tbar', start: null, pts: [], hover: null, sel: null, plan: null, route: false, zoneR: 260, pending: false };
 
   var ENG = {      // per lift style: rope clearance, tower spacing rules, max single span
     chair: { clear: 9, minSpan: 70, maxSpan: 230, hardSpan: 420, sag: 0.03 },
@@ -150,7 +150,7 @@
     var p92 = sorted[Math.min(n - 1, Math.floor(n * 0.92))];
     return { ys: ys, grads: grads, maxGrad: maxG, gradeGrad: p92, diff: SK.gradeOf(p92), len: len, drop: ys[0] - ys[n - 1], uphillAt: uphillAt, cliffAt: cliffAt };
   };
-  B.pistePlan = function (clicks) {
+  B.pistePlan = function (clicks, route) {
     var pts = B.resample(clicks), st = B.pisteStats(pts), cost = 0, forest = 0, err = null;
     for (var i = 1; i < pts.length; i++) {
       var p = pts[i], sl = T.slopeAt(p.x, p.z), along = Math.abs(st.grads[i]);
@@ -161,8 +161,9 @@
     }
     if (st.len < 150) err = 'Too short - draw at least 150 m.';
     else if (st.uphillAt >= 0) err = 'The piste runs uphill at ' + Math.round(st.uphillAt * 15) + ' m. Skis only go down.';
-    else if (st.cliffAt >= 0) err = 'That is a cliff (' + Math.round(st.grads[st.cliffAt] * 100) + '%). Find a way around.';
+    else if (st.cliffAt >= 0 && !(route && st.maxGrad < 1.15)) err = 'That is a cliff (' + Math.round(st.grads[st.cliffAt] * 100) + '%). Find a way around.';
     else if (st.drop < 20) err = 'Almost flat - guests would have to walk.';
+    if (route) return { pts: pts, st: st, cost: Math.round(1500 + st.len * 2.2), weeks: 1, error: err, forest: forest, route: true };
     return { pts: pts, st: st, cost: Math.round(cost), weeks: Math.max(1, Math.round(st.len / 1100 + forest / 700)), error: err, forest: forest };
   };
 
@@ -194,6 +195,7 @@
   B.pickObject = function (p) {
     var G = SK.G, best = null, bd = Math.max(70, Wd.cam.dist / 90);
     G.huts.forEach(function (h) { var d = Math.hypot(h.x - p.x, h.z - p.z) * 0.6; if (d < bd) { bd = d; best = { kind: 'hut', obj: h }; } });
+    (G.zones || []).forEach(function (zn) { var d = Math.abs(Math.hypot(zn.x - p.x, zn.z - p.z) - zn.r) * 0.7; if (d < bd) { bd = d; best = { kind: 'zone', obj: zn }; } });
     G.lifts.forEach(function (l) { var d = distSeg(p.x, p.z, l.a.x, l.a.z, l.b.x, l.b.z) * 0.8; if (d < bd) { bd = d; best = { kind: 'lift', obj: l }; } });
     G.pistes.forEach(function (ps) {
       for (var i = 0; i < ps.pts.length; i += 2) { var d = Math.hypot(ps.pts[i].x - p.x, ps.pts[i].z - p.z); if (d < bd) { bd = d; best = { kind: 'piste', obj: ps }; } }
@@ -203,8 +205,8 @@
 
   // ------------------------------------------------------------------ tool state
   B.setTool = function (tool) {
-    if (tool !== 'inspect' && SK.G.phase !== 'summer') { SK.UI.toast('Construction happens in summer. The crews are home for the winter.', 'warn'); tool = 'inspect'; }
-    B.tool = tool; B.start = null; B.pts = []; B.plan = null;
+    if (tool !== 'inspect' && tool !== 'zone' && SK.G.phase !== 'summer') { SK.UI.toast('Construction happens in summer. The crews are home for the winter.', 'warn'); tool = 'inspect'; }
+    B.tool = tool; B.start = null; B.pts = []; B.plan = null; B.pending = false;
     if (tool !== 'inspect') B.sel = null;
     T.uniforms.uShowHubs.value = (tool === 'lift' || tool === 'piste') ? 1 : 0;
     B.refreshView();
@@ -213,11 +215,11 @@
   };
   B.refreshView = function () {
     var v = SK.UI.view;
-    T.uniforms.uOverlay.value = (v.slope || B.tool === 'piste') ? 1 : 0;
+    T.uniforms.uOverlay.value = (v.ava || B.tool === 'zone') ? 2 : ((v.slope || B.tool === 'piste') ? 1 : 0);
     T.uniforms.uContour.value = (v.contour || B.tool === 'piste' || B.tool === 'lift') ? 1 : 0;
   };
   B.cancel = function () {
-    if (B.start || B.pts.length) { B.start = null; B.pts = []; B.plan = null; B.redraw(); SK.UI.refreshPlan(); }
+    if (B.start || B.pts.length || B.pending) { B.start = null; B.pts = []; B.plan = null; B.pending = false; B.redraw(); SK.UI.refreshPlan(); }
     else if (B.tool !== 'inspect') B.setTool('inspect');
     else { B.sel = null; B.redraw(); SK.UI.refreshSelection(); }
   };
@@ -231,7 +233,7 @@
   B.updatePlan = function () {
     B.plan = null;
     var h = B.hover;
-    if (B.tool === 'lift' && B.start && h) {
+    if (B.tool === 'lift' && B.start && h && Math.hypot(h.x - B.start.x, h.z - B.start.z) > 40) {
       var ty = SK.LIFT[B.liftType], e = B.snap(h);
       var g = B.liftGeom(ty, B.start, { x: e.x, y: e.y, z: e.z });
       var err = g.error || Sim.checkBudget(g.cost, g.weeks);
@@ -240,7 +242,7 @@
       var clicks = B.pts.slice();
       if (h) { var s = B.snap(h); if (Math.hypot(s.x - clicks[clicks.length - 1].x, s.z - clicks[clicks.length - 1].z) > 25) clicks.push({ x: s.x, z: s.z }); }
       if (clicks.length >= 2) {
-        var pl = B.pistePlan(clicks);
+        var pl = B.pistePlan(clicks, B.route);
         pl.kind = 'piste'; pl.hard = !!pl.error; pl.error = pl.error || Sim.checkBudget(pl.cost, pl.weeks);
         B.plan = pl;
       }
@@ -250,6 +252,8 @@
       var cost = 60000 + Math.round(Math.max(0, h.y - 1400) * 60), e2 = null;
       if (sl > 0.35) e2 = 'Too steep for a hut.'; else if (!near) e2 = 'Huts need a piste within 160 m.';
       B.plan = { kind: 'hut', cost: cost, weeks: 3, error: e2 || Sim.checkBudget(cost, 3), hard: !!e2, pt: h };
+    } else if (B.tool === 'zone' && h) {
+      B.plan = { kind: 'zone', pt: h, r: B.zoneR, error: SK.G.zones.length >= T.MAXZONES ? 'Ten closure zones is the limit.' : null };
     }
     B.redraw();
     SK.UI.refreshPlan();
@@ -283,10 +287,12 @@
           var gr = st.grads[i];
           cols.push(gr < -0.035 || gr > 0.85 ? COL.bad : COL[SK.gradeOf(gr)]);
         }
-        Wd.previewRibbon(B.plan.pts, cols, 44);
+        Wd.previewRibbon(B.plan.pts, B.route ? cols.map(function (c) { return c === COL.bad ? c : 0xf08a1c; }) : cols, B.route ? 16 : 44);
       }
     }
     if (B.tool === 'hut' && B.plan && B.plan.kind === 'hut') Wd.previewRing(B.plan.pt.x, B.plan.pt.z, 30, !B.plan.error);
+    if (B.tool === 'zone' && B.plan && B.plan.kind === 'zone') Wd.previewRing(B.plan.pt.x, B.plan.pt.z, B.plan.r, 'red');
+    if (B.tool === 'zone' || SK.UI.view.ava) (Sim.hazards || []).forEach(function (hz) { if (!hz.zoned) Wd.previewRing(hz.x, hz.z, 70, 'red'); });
     if (B.sel) {
       var o = B.sel.obj;
       if (B.sel.kind === 'piste') Wd.previewRibbon(o.pts, o.pts.map(function () { return 0xffc21a; }), o.width + 26);
@@ -294,7 +300,7 @@
         var pp = [];
         for (i = 0; i <= 20; i++) pp.push({ x: o.a.x + (o.b.x - o.a.x) * i / 20, z: o.a.z + (o.b.z - o.a.z) * i / 20 });
         Wd.previewRibbon(pp, pp.map(function () { return 0xffc21a; }), 30, 3);
-      } else Wd.previewRing(o.x, o.z, 34, true);
+      } else Wd.previewRing(o.x, o.z, B.sel.kind === 'zone' ? o.r : 34, true);
     }
     // warnings on the map
     if (G && G.phase === 'summer' && (B.tool === 'lift' || B.tool === 'piste' || B.tool === 'inspect')) {
@@ -303,12 +309,15 @@
   };
 
   // ------------------------------------------------------------------ input
-  B.onMove = function (p) { B.hover = p; if (B.tool !== 'inspect' && B.tool !== 'demolish') B.updatePlan(); };
+  B.onMove = function (p) { if (B.pending) return; B.hover = p; if (B.tool !== 'inspect' && B.tool !== 'demolish') B.updatePlan(); };
+  // touch screens have no hover: a tap proposes, the Build button in the plan card confirms
+  B.confirm = function () { if (!B.pending || !B.hover) return; B.pending = false; var t = Wd.touch; Wd.touch = false; B.onClick(B.hover); Wd.touch = t; };
 
   B.onClick = function (p) {
     if (!p) return;
     var G = SK.G;
     B.hover = p;
+    if (Wd.touch && ((B.tool === 'lift' && B.start) || B.tool === 'hut' || B.tool === 'zone')) { B.updatePlan(); B.pending = !!B.plan; SK.UI.refreshPlan(); return; }
     if (B.tool === 'inspect') {
       B.sel = B.pickObject(p);
       B.redraw(); SK.UI.refreshSelection();
@@ -316,7 +325,7 @@
       var hit = B.pickObject(p);
       if (hit) {
         var refund = Sim.remove(hit.kind, hit.obj);
-        SK.UI.toast('Removed ' + (hit.obj.name || 'the hut') + (refund ? '. Scrap value ' + SK.fmtMoney(refund) + '.' : '.'));
+        SK.UI.toast('Removed ' + (hit.obj.name || (hit.kind === 'zone' ? 'the closure zone' : 'the hut')) + (refund ? '. Scrap value ' + SK.fmtMoney(refund) + '.' : '.'));
         B.redraw(); SK.UI.refreshAll();
       }
     } else if (B.tool === 'lift') {
@@ -355,14 +364,18 @@
       Sim.addHut({ x: p.x, y: p.y, z: p.z }, B.plan.cost, B.plan.weeks);
       SK.UI.toast('Mountain hut opened. Kaiserschmarrn for everyone.', 'good');
       B.updatePlan(); SK.UI.refreshAll();
+    } else if (B.tool === 'zone') {
+      var ze = Sim.addZone({ x: p.x, z: p.z }, B.zoneR);
+      if (ze) SK.UI.toast(ze, 'warn'); else SK.UI.toast('Closure zone marked. Nobody skis in there.', 'good');
+      B.plan = null; B.redraw(); SK.UI.refreshAll();
     }
   };
 
   B.finishPiste = function () {
     if (B.tool !== 'piste' || B.pts.length < 2) return;
-    var pl = B.pistePlan(B.pts), err = pl.error || Sim.checkBudget(pl.cost, pl.weeks);
+    var pl = B.pistePlan(B.pts, B.route), err = pl.error || Sim.checkBudget(pl.cost, pl.weeks);
     if (err) { SK.UI.toast(err, 'warn'); if (pl.error) { B.pts.pop(); B.updatePlan(); } return; }
-    var p = Sim.addPiste(pl.pts, pl.cost, pl.weeks);
+    var p = Sim.addPiste(pl.pts, pl.cost, pl.weeks, B.route);
     SK.UI.toast('Piste "' + p.name + '" opened: ' + SK.DIFF[p.diff].name.toLowerCase() + ', ' + (pl.st.len / 1000).toFixed(2) + ' km.', 'good');
     B.pts = []; B.plan = null;
     B.redraw(); SK.UI.refreshAll();
@@ -378,7 +391,7 @@
       else if (e.key === 'Enter') B.finishPiste();
       else if (e.key === 'Backspace') B.undoPoint();
       else if (e.key === '1') B.setTool('inspect'); else if (e.key === '2') B.setTool('lift'); else if (e.key === '3') B.setTool('piste');
-      else if (e.key === '4') B.setTool('hut'); else if (e.key === '5') B.setTool('demolish');
+      else if (e.key === '4') B.setTool('hut'); else if (e.key === '5') B.setTool('zone'); else if (e.key === '6') B.setTool('demolish');
     });
   };
 })(window.SK);

@@ -1,4 +1,4 @@
-"""Fetch real elevation data for St. Anton am Arlberg and bake it into data/terrain.js.
+"""Fetch real elevation data for the whole Arlberg (St. Anton - Stuben - Zuers - Lech - Warth - Schroecken) and bake it into data/terrain.js.
 
 Source: Mapzen/AWS "Terrain Tiles" (terrarium encoding), public dataset on AWS Open Data.
         Over Austria the underlying DEM is the 10 m data.gv.at model.
@@ -8,11 +8,11 @@ import base64, io, json, math, os, sys, urllib.request
 import numpy as np
 from PIL import Image
 
-# Bounding box around St. Anton: Valluga/Galzig/Kapall (north), Rendl (south), St. Christoph (west)
-LON0, LON1 = 10.170, 10.320
-LAT0, LAT1 = 47.080, 47.180
+# Bounding box: Rendl (south) to Warth (north), Schroecken (west) to St. Jakob (east)
+LON0, LON1 = 10.060, 10.320
+LAT0, LAT1 = 47.075, 47.285
 ZOOM = 12
-GRID_W, GRID_H = 384, 376          # ~30 m cells
+GRID_W, GRID_H = 520, 616          # ~38 m cells
 
 cache, out = sys.argv[1], sys.argv[2]
 os.makedirs(cache, exist_ok=True)
@@ -85,21 +85,21 @@ def at(lat, lon):
     return i, j
 
 
-# sanity check against known landmarks (local max within ~600 m for summits)
-for name, lat, lon, summit in [("Valluga", 47.1575, 10.2131, 1), ("St. Anton", 47.1287, 10.2670, 0),
-                               ("Galzig", 47.1308, 10.2275, 1), ("Kapall", 47.1497, 10.2600, 0),
-                               ("Gampen", 47.1397, 10.2625, 0), ("St. Christoph", 47.1283, 10.2135, 0),
-                               ("Rendl", 47.1090, 10.2640, 0), ("Schindler Spitze", 47.1475, 10.2020, 1),
-                               ("Nasserein", 47.1345, 10.2820, 0), ("Riffelscharte", 47.0930, 10.2560, 0)]:
+# sanity check against known landmarks
+for name, lat, lon in [("Valluga", 47.1576, 10.2131), ("St. Anton", 47.1287, 10.2670), ("St. Christoph", 47.1283, 10.2135),
+                       ("Stuben", 47.1367, 10.1617), ("Alpe Rauz", 47.1397, 10.1867), ("Zuers", 47.1700, 10.1633),
+                       ("Lech", 47.2083, 10.1417), ("Oberlech", 47.2117, 10.1283), ("Zug", 47.1960, 10.1080),
+                       ("Warth", 47.2583, 10.1833), ("Schroecken", 47.2583, 10.0917), ("Flexenpass", 47.1583, 10.1650),
+                       ("Ruefikopf", 47.2020, 10.1630), ("Trittkopf", 47.1583, 10.1850), ("Kriegerhorn", 47.2130, 10.1050),
+                       ("Mohnenfluh", 47.2280, 10.1070), ("Saloberkopf", 47.2620, 10.1430), ("Albonagrat", 47.1180, 10.1650),
+                       ("Madloch", 47.1850, 10.1350), ("Omeshorn", 47.1900, 10.1300), ("Hasenfluh", 47.1730, 10.1430),
+                       ("Karhorn", 47.2430, 10.1550), ("Langen", 47.1320, 10.1220)]:
     i, j = at(lat, lon)
     i, j = int(round(i)), int(round(j))
-    if summit:
-        r = 20
-        sub = grid[max(0, j - r):j + r + 1, max(0, i - r):i + r + 1]
-        jj, ii = np.unravel_index(np.argmax(sub), sub.shape)
-        j2, i2 = max(0, j - r) + jj, max(0, i - r) + ii
-        lon2 = LON0 + (LON1 - LON0) * i2 / (GRID_W - 1)
-        lat2 = LAT1 + (LAT0 - LAT1) * j2 / (GRID_H - 1)
-        print(f"{name:18s} peak {grid[j2, i2]:.0f} m at {lat2:.4f},{lon2:.4f}")
-    else:
-        print(f"{name:18s} {grid[j, i]:.0f} m")
+    r = 14
+    sub = grid[max(0, j - r):j + r + 1, max(0, i - r):i + r + 1]
+    jj, ii = np.unravel_index(np.argmax(sub), sub.shape)
+    j2, i2 = max(0, j - r) + jj, max(0, i - r) + ii
+    lon2 = LON0 + (LON1 - LON0) * i2 / (GRID_W - 1)
+    lat2 = LAT1 + (LAT0 - LAT1) * j2 / (GRID_H - 1)
+    print(f"{name:14s} here {grid[j, i]:.0f} m | highest within 500 m: {grid[j2, i2]:.0f} m at {lat2:.4f},{lon2:.4f}")

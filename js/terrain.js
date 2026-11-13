@@ -1,15 +1,22 @@
-// Terrain: real heightmap of St. Anton, sampling helpers, shaded mesh, forest and villages
+// Terrain: real heightmap of the Arlberg, sampling helpers, shaded mesh, forest
 (function (SK) {
   'use strict';
   var T = SK.T = {};
   var W, H, hgt;
+  T.MAXHUBS = 12; T.MAXZONES = 10;
 
   T.init = function () {
     var D = window.TERRAIN_DATA;
-    W = T.W = D.w; H = T.H = D.h;
-    var bin = atob(D.b64), n = W * H;
-    hgt = T.h = new Float32Array(n);
-    for (var i = 0; i < n; i++) hgt[i] = (bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8)) / 10;
+    W = D.w; H = D.h;
+    var bin = atob(D.b64), n = W * H, i, j;
+    hgt = new Float32Array(n);
+    for (i = 0; i < n; i++) hgt[i] = (bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8)) / 10;
+    if (SK.CFG.LOW) {                       // phones: half resolution mesh, same mountains
+      var W2 = (W + 1) >> 1, H2 = (H + 1) >> 1, h2 = new Float32Array(W2 * H2);
+      for (j = 0; j < H2; j++) for (i = 0; i < W2; i++) h2[j * W2 + i] = hgt[Math.min(H - 1, j * 2) * W + Math.min(W - 1, i * 2)];
+      hgt = h2; W = W2; H = H2;
+    }
+    T.W = W; T.H = H; T.h = hgt;
     T.sizeX = D.widthM; T.sizeZ = D.heightM;
     T.dx = T.sizeX / (W - 1); T.dz = T.sizeZ / (H - 1);
     T.x0 = -T.sizeX / 2; T.z0 = -T.sizeZ / 2;
@@ -40,6 +47,8 @@
     return [(T.heightAt(x + e, z) - T.heightAt(x - e, z)) / (2 * e), (T.heightAt(x, z + e) - T.heightAt(x, z - e)) / (2 * e)];
   };
   T.slopeAt = function (x, z) { var g = T.gradAt(x, z); return Math.sqrt(g[0] * g[0] + g[1] * g[1]); };
+  // +1 = faces due south (sunny, melts first), -1 = faces north
+  T.southAt = function (x, z) { var g = T.gradAt(x, z), l = Math.hypot(g[0], g[1]); return l > 0.02 ? -g[1] / l : 0; };
   T.inside = function (x, z, m) {
     m = m || 0;
     return x > T.x0 + m && x < -T.x0 - m && z > T.z0 + m && z < -T.z0 - m;
@@ -60,14 +69,14 @@
   function sstep(a, b, x) { var t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
   T.sstep = sstep;
 
-  // forest density 0..1 (procedural: below the tree line, not on cliffs, valley floor kept as meadow)
+  // forest density 0..1 (below the tree line, not on cliffs, valley floors kept as meadow; north slopes are denser)
   T.forestAt = function (x, z) {
-    var h = T.heightAt(x, z), s = T.slopeAt(x, z);
-    var tl = SK.CFG.TREELINE + (fbm(x / 900, z / 900) - 0.5) * 300;
+    var h = T.heightAt(x, z), g = T.gradAt(x, z), s = Math.sqrt(g[0] * g[0] + g[1] * g[1]);
+    var tl = SK.CFG.TREELINE + (fbm(x / 900, z / 900) - 0.5) * 300 - (s > 0.02 ? -g[1] / s : 0) * 60;
     var f = 1 - sstep(tl - 140, tl + 40, h);
     f *= 1 - sstep(0.8, 1.05, s);
-    if (h < 1440) f *= sstep(0.10, 0.22, s);          // flat valley floor = meadows and villages
-    f *= 0.15 + 0.85 * sstep(0.26, 0.44, fbm(x / 420 + 7.3, z / 420 + 3.9));
+    f *= sstep(0.07, 0.2, s + sstep(1500, 1700, h) * 0.08);      // flat valley floors and high plateaus = meadows
+    f *= 0.12 + 0.88 * sstep(0.26, 0.44, fbm(x / 420 + 7.3, z / 420 + 3.9));
     return f;
   };
 
@@ -77,7 +86,7 @@
   function bakeShade() {
     var out = new Float32Array(W * H);
     var hl = Math.hypot(T.SUN[0], T.SUN[2]), hx = T.SUN[0] / hl, hz = T.SUN[2] / hl, tanA = T.SUN[1] / hl;
-    var step = 38, maxSteps = 150, maxH = T.maxH;
+    var step = Math.max(38, T.dx), maxSteps = 150, maxH = T.maxH;
     for (var j = 0; j < H; j++) {
       for (var i = 0; i < W; i++) {
         var x = T.x0 + i * T.dx, z = T.z0 + j * T.dz, h0 = hgt[j * W + i] + 3, sh = 1;
@@ -94,6 +103,11 @@
     }
     return out;
   }
+  T.shadeAt = function (x, z) {
+    var i = Math.round((x - T.x0) / T.dx), j = Math.round((z - T.z0) / T.dz);
+    if (i < 0 || j < 0 || i >= W || j >= H) return 1;
+    return T.shade[j * W + i];
+  };
 
   // ---- mesh ---------------------------------------------------------------
   var VERT = [
@@ -105,8 +119,9 @@
 
   var FRAG = [
     'precision highp float;',
-    'uniform sampler2D uPiste; uniform vec3 uSun; uniform float uSnowline; uniform float uSmReach; uniform vec3 uFogColor; uniform float uFogDensity;',
-    'uniform float uContour; uniform float uOverlay; uniform vec3 uHubs[3]; uniform float uShowHubs; uniform vec3 uSunCol; uniform vec3 uAmbCol;',
+    'uniform sampler2D uPiste; uniform sampler2D uDecal; uniform vec3 uSun; uniform float uSnowline; uniform float uSmLine; uniform vec3 uFogColor; uniform float uFogDensity;',
+    'uniform float uContour; uniform float uOverlay; uniform vec3 uHubs[' + T.MAXHUBS + ']; uniform float uShowHubs; uniform vec3 uZones[' + T.MAXZONES + '];',
+    'uniform vec3 uSunCol; uniform vec3 uAmbCol; uniform float uTime;',
     'varying float vH; varying vec3 vN; varying float vShade; varying float vForest; varying vec2 vUv2; varying vec3 vW; varying float vDist;',
     'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }',
     'float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);',
@@ -114,43 +129,53 @@
     'void main(){',
     ' vec3 N = normalize(vN);',
     ' float steep = sqrt(max(0.0, 1.0 - N.y*N.y)) / max(N.y, 0.05);',       // rise / run
-    ' float n1 = noise(vW.xz/260.0), n2 = noise(vW.xz/37.0);',
-    ' vec3 meadow = mix(vec3(0.43,0.55,0.27), vec3(0.60,0.60,0.38), smoothstep(1500.0, 2450.0, vH + n1*200.0));',
-    ' meadow *= 0.93 + 0.14*n2;',
-    ' vec3 rock = mix(vec3(0.56,0.52,0.47), vec3(0.40,0.38,0.36), n2*0.6 + n1*0.4);',
-    ' vec3 forestFloor = vec3(0.21,0.31,0.18);',
-    ' float rockF = clamp(smoothstep(0.62, 0.95, steep + n2*0.15) + smoothstep(2350.0, 2800.0, vH + n1*250.0)*0.75, 0.0, 1.0);',
+    ' float n1 = noise(vW.xz/260.0), n2 = noise(vW.xz/37.0), n3 = noise(vW.xz/9.0);',
+    ' vec3 meadow = mix(vec3(0.42,0.55,0.26), vec3(0.61,0.60,0.38), smoothstep(1500.0, 2450.0, vH + n1*200.0));',
+    ' meadow *= 0.92 + 0.16*n2;',
+    // rock: layered strata, darker in the cracks
+    ' float strata = noise(vec2(vH/14.0 + n1*3.0, (vW.x+vW.z)/420.0));',
+    ' vec3 rock = mix(vec3(0.60,0.56,0.51), vec3(0.37,0.36,0.36), strata*0.55 + n2*0.3 + n3*0.15);',
+    ' vec3 forestFloor = vec3(0.20,0.30,0.17);',
+    ' float rockF = clamp(smoothstep(0.58, 0.88, steep + n2*0.14) + smoothstep(2350.0, 2800.0, vH + n1*250.0)*0.75, 0.0, 1.0);',
     ' vec3 summer = mix(meadow, forestFloor, vForest*0.85);',
     ' summer = mix(summer, rock, rockF);',
-    ' float hs = smoothstep(uSnowline - 110.0, uSnowline + 110.0, vH + (n1 - 0.5)*220.0);',
-    ' float snowAmt = hs * (1.0 - smoothstep(0.95, 1.5, steep + n2*0.25));',
-    ' vec3 snow = vec3(0.985, 0.985, 0.99);',
+    // snow: sunny south faces lose it first, steep rock sheds it
+    ' float hEff = vH - N.z * 300.0 + (n1 - 0.5) * 200.0;',
+    ' float hs = smoothstep(uSnowline - 100.0, uSnowline + 100.0, hEff);',
+    ' float snowAmt = hs * (1.0 - smoothstep(0.86, 1.32, steep + n2*0.22 + n3*0.08));',
+    ' vec3 snow = vec3(0.985, 0.985, 0.99) * (0.985 + 0.02*n2);',
     ' vec3 col = mix(summer, snow, snowAmt);',
-    // pistes
+    // pistes: R = groomed core, G = snowmaking
     ' vec4 P = texture2D(uPiste, vUv2);',
-    ' float core = P.a * smoothstep(0.55, 0.80, min(P.r, min(P.g, P.b)));',
-    ' float rim = clamp(P.a - core, 0.0, 1.0);',
-    ' float sm = smoothstep(0.03, 0.09, P.b - P.r);',
-    ' float pSnow = max(hs, sm * smoothstep(uSnowline - uSmReach - 90.0, uSnowline - uSmReach + 90.0, vH));',
+    ' float core = P.r;',
+    ' float pSnow = max(hs, step(0.5, P.g) * step(uSmLine, vH + 5.0));',
     ' vec3 pGrass = mix(summer, vec3(0.70,0.72,0.47), 0.7);',
     ' float cord = 0.985 + 0.03 * step(0.5, fract((vW.x + vW.z) / 9.0));',
-    ' vec3 coreCol = mix(pGrass, vec3(0.93,0.96,1.0) * cord, pSnow);',
+    ' vec3 coreCol = mix(pGrass, vec3(0.925,0.955,1.0) * cord, pSnow);',
     ' col = mix(col, coreCol, core);',
-    ' col = mix(col, P.rgb, rim * 0.92);',
+    // decals: piste edges, roads, rail, rivers, avalanche debris
+    ' vec4 D = texture2D(uDecal, vUv2);',
+    ' col = mix(col, D.rgb, D.a);',
     // planning overlays
-    ' if (uOverlay > 0.5) {',
+    ' if (uOverlay > 0.5 && uOverlay < 1.5) {',
     '  vec3 oc = steep <= 0.25 ? vec3(0.25,0.55,0.95) : (steep <= 0.40 ? vec3(0.92,0.25,0.22) : (steep <= 0.85 ? vec3(0.12,0.13,0.16) : vec3(0.55,0.35,0.6)));',
-    '  col = mix(col, oc, 0.32 * (1.0 - P.a));',
+    '  col = mix(col, oc, 0.32 * (1.0 - core));',
+    ' } else if (uOverlay > 1.5) {',                                          // avalanche terrain: 30-45 degrees, no forest
+    '  float av = smoothstep(0.52, 0.62, steep) * (1.0 - smoothstep(1.05, 1.3, steep)) * (1.0 - smoothstep(0.25, 0.6, vForest));',
+    '  col = mix(col, mix(vec3(1.0,0.62,0.1), vec3(0.9,0.12,0.1), smoothstep(0.62, 0.85, steep)), av * 0.6);',
     ' }',
     ' float cl = vH / 100.0; float cf = abs(fract(cl - 0.5) - 0.5) / fwidth(cl);',
-    ' col = mix(col, col * 0.72, (1.0 - min(cf, 1.0)) * uContour * (1.0 - P.a) * (1.0 - smoothstep(9000.0, 20000.0, vDist)));',
-    ' if (uShowHubs > 0.5) { for (int i = 0; i < 3; i++) { float d = distance(vW.xz, uHubs[i].xy);',
+    ' col = mix(col, col * 0.72, (1.0 - min(cf, 1.0)) * uContour * (1.0 - core) * (1.0 - smoothstep(9000.0, 20000.0, vDist)));',
+    ' if (uShowHubs > 0.5) { for (int i = 0; i < ' + T.MAXHUBS + '; i++) { if (uHubs[i].z < 1.0) continue; float d = distance(vW.xz, uHubs[i].xy);',
     '   float ring = 1.0 - smoothstep(0.0, 14.0, abs(d - uHubs[i].z)); float fill = (1.0 - step(uHubs[i].z, d)) * 0.16;',
     '   col = mix(col, vec3(1.0, 0.72, 0.15), max(ring * 0.9, fill)); } }',
+    ' for (int i = 0; i < ' + T.MAXZONES + '; i++) { if (uZones[i].z < 1.0) continue; float d = distance(vW.xz, uZones[i].xy);',
+    '   float ring = 1.0 - smoothstep(0.0, 10.0, abs(d - uZones[i].z)); float hatch = step(0.55, fract((vW.x - vW.z) / 46.0)) * (1.0 - step(uZones[i].z, d));',
+    '   col = mix(col, vec3(0.86, 0.1, 0.1), max(ring * 0.95, hatch * 0.42)); }',
     // light
     ' float nl = max(dot(N, uSun), 0.0);',
     ' float lit = nl * vShade;',
-    ' vec3 light = uAmbCol * (0.82 + 0.18 * N.y) + uSunCol * lit;',
+    ' vec3 light = uAmbCol * (0.80 + 0.20 * N.y) + uSunCol * lit;',
     ' col *= light;',
     ' float fog = 1.0 - exp(-uFogDensity * uFogDensity * vDist * vDist);',
     ' col = mix(col, uFogColor, clamp(fog, 0.0, 1.0));',
@@ -158,7 +183,7 @@
     '}'
   ].join('\n');
 
-  T.buildMesh = function (pisteTexture) {
+  T.buildMesh = function (pisteTexture, decalTexture) {
     var n = W * H;
     var pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
     var forest = new Float32Array(n);
@@ -191,13 +216,16 @@
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeBoundingSphere();
     T.shade = shade;
+    var hubs = [], zones = [];
+    for (i = 0; i < T.MAXHUBS; i++) hubs.push(new THREE.Vector3());
+    for (i = 0; i < T.MAXZONES; i++) zones.push(new THREE.Vector3());
     T.uniforms = {
-      uPiste: { value: pisteTexture },
+      uPiste: { value: pisteTexture }, uDecal: { value: decalTexture },
       uSun: { value: new THREE.Vector3(T.SUN[0], T.SUN[1], T.SUN[2]) },
-      uSnowline: { value: 2650 }, uSmReach: { value: 0 },
-      uFogColor: { value: new THREE.Color(0xdfe9f2) }, uFogDensity: { value: 0.000028 },
+      uSnowline: { value: 2650 }, uSmLine: { value: 9999 }, uTime: { value: 0 },
+      uFogColor: { value: new THREE.Color(0xdfe9f2) }, uFogDensity: { value: 0.000018 },
       uContour: { value: 0 }, uOverlay: { value: 0 }, uShowHubs: { value: 0 },
-      uHubs: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
+      uHubs: { value: hubs }, uZones: { value: zones },
       uSunCol: { value: new THREE.Vector3(0.50, 0.44, 0.33) }, uAmbCol: { value: new THREE.Vector3(0.60, 0.66, 0.79) },
     };
     var mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: T.uniforms });
@@ -205,7 +233,7 @@
     mesh.frustumCulled = false;
 
     // diorama skirt
-    var sp = [], si = [], base = T.minH - 260, q = 0;
+    var sp = [], si = [], base = T.minH - 320, q = 0;
     function edge(ax, az, ah, bx, bz, bh) {
       sp.push(ax, ah, az, bx, bh, bz, ax, base, az, bx, base, bz);
       si.push(q, q + 2, q + 1, q + 1, q + 2, q + 3); q += 4;
@@ -231,12 +259,12 @@
 
   // ---- trees ---------------------------------------------------------------
   T.treeCandidates = function () {
-    var rnd = SK.rng(4711), out = [], sp = 27;
+    var rnd = SK.rng(4711), out = [], sp = SK.CFG.LOW ? 52 : 34;
     for (var z = T.z0 + 20; z < -T.z0 - 20; z += sp) {
       for (var x = T.x0 + 20; x < -T.x0 - 20; x += sp) {
         var px = x + (rnd() - 0.5) * sp, pz = z + (rnd() - 0.5) * sp, r = rnd(), r2 = rnd();
         var f = T.forestAt(px, pz);
-        if (r < f * 0.9) out.push(px, T.heightAt(px, pz), pz, 0.75 + r2 * 0.6);
+        if (r < f * 0.92) out.push(px, T.heightAt(px, pz), pz, 0.8 + r2 * 0.7);
       }
     }
     return new Float32Array(out);
@@ -245,7 +273,7 @@
   // ---- ray picking -----------------------------------------------------------
   T.raycast = function (o, d) {
     var t = 0, step = 25, prev = 0;
-    for (var k = 0; k < 2600; k++) {
+    for (var k = 0; k < 3200; k++) {
       var x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
       if (y < T.minH - 50 && d.y <= 0) return null;
       if (T.inside(x, z, 0) && y <= T.heightAt(x, z)) {
