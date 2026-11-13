@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arlberg Pioneers — build St. Anton from 1937 to the future</title>
+<style>
+  :root {
+    --ink: #16212c; --ink2: #5a6877; --ink3: #8e9aa7; --panel: rgba(255,255,255,0.93); --line: rgba(22,33,44,0.10);
+    --accent: #e2483a; --accent-d: #c2382c; --blue: #2b7fd6; --good: #1c9a5e; --warn: #d4860a; --soft: #f2f5f8;
+    --r: 14px; --shadow: 0 8px 30px rgba(20,35,55,0.16), 0 1px 3px rgba(20,35,55,0.10);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9f2; color: var(--ink);
+    font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  body.tooling canvas#scene { cursor: crosshair; }
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .maplabel { position: absolute; left: 0; top: 0; white-space: nowrap; text-align: center; color: #1b2733; will-change: transform;
+    text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 2px #fff; font-size: 11px; line-height: 1.15; }
+  .maplabel b { display: block; font-weight: 650; letter-spacing: 0.02em; }
+  .maplabel i { font-style: normal; font-size: 10px; color: #4a5866; }
+  .maplabel.village b { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.09em; }
+  .maplabel.area b { font-weight: 500; font-style: italic; color: #40505f; }
+  .maplabel.peak b::before { content: "▲ "; font-size: 8px; vertical-align: 1px; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #hud > * { pointer-events: auto; }
+  .card { background: var(--panel); border-radius: var(--r); box-shadow: var(--shadow); backdrop-filter: blur(10px) saturate(1.2); }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* top bar */
+  #topbar { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: 10px; align-items: stretch; pointer-events: none; }
+  #topbar > * { pointer-events: auto; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 8px 16px 8px 10px; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; background: var(--accent); display: grid; place-items: center; }
+  .logo svg { width: 22px; height: 22px; }
+  .brand .title { font-weight: 750; letter-spacing: 0.01em; font-size: 14px; }
+  .brand .sub { color: var(--ink2); font-size: 12px; }
+  #stats { display: flex; padding: 4px 6px; flex: 0 1 auto; }
+  .stat { padding: 5px 14px; border-right: 1px solid var(--line); min-width: 84px; }
+  .stat:last-child { border-right: 0; }
+  .stat label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink3); font-weight: 600; }
+  .stat span { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stat span small { font-size: 11px; font-weight: 550; color: var(--ink2); }
+  .stat.neg span { color: var(--accent); }
+  .spacer { flex: 1; pointer-events: none !important; }
+  #controls { display: flex; align-items: center; gap: 6px; padding: 6px; }
+  .seg { display: flex; background: var(--soft); border-radius: 10px; padding: 3px; }
+  .seg button { padding: 6px 10px; border-radius: 8px; font-weight: 650; color: var(--ink2); min-width: 34px; }
+  .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,0.14); }
+  .cta { background: var(--accent); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 700; letter-spacing: 0.01em; white-space: nowrap; }
+  .cta:hover { background: var(--accent-d); }
+  .cta.ghost { background: var(--soft); color: var(--ink); }
+  .cta.ghost:hover { background: #e6ebf0; }
+  .cta:disabled { opacity: 0.45; cursor: not-allowed; }
+  #seasonbar { position: absolute; top: 76px; left: 12px; right: 12px; height: 4px; border-radius: 4px; background: rgba(255,255,255,0.55); overflow: hidden; display: none; }
+  #seasonbar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 4px; }
+
+  /* tools */
+  #tools { position: absolute; left: 12px; top: 96px; display: flex; flex-direction: column; gap: 4px; padding: 6px; }
+  #tools button { width: 62px; padding: 8px 0 6px; border-radius: 10px; display: grid; justify-items: center; gap: 3px; font-size: 10.5px; font-weight: 650; color: var(--ink2); }
+  #tools button svg { width: 24px; height: 24px; }
+  #tools button:hover { background: var(--soft); }
+  #tools button.on { background: var(--ink); color: #fff; }
+  #tools button kbd { position: absolute; }
+  #tools.disabled button:not(.always) { opacity: 0.35; }
+
+  /* bottom tray */
+  #bottom { position: absolute; left: 90px; right: 366px; bottom: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+  #bottom > * { pointer-events: auto; }
+  #plan { padding: 10px 14px; max-width: 760px; display: none; }
+  #plan h4 { margin: 0 0 2px; font-size: 14px; }
+  #plan .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; color: var(--ink2); }
+  #plan .row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  #plan .err { color: var(--accent); font-weight: 650; margin-top: 4px; }
+  #plan .ok { color: var(--good); font-weight: 650; margin-top: 4px; }
+  #plan .hint { color: var(--ink2); }
+  #plan .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .btn { background: var(--soft); border-radius: 8px; padding: 6px 10px; font-weight: 650; }
+  .btn:hover { background: #e4e9ee; }
+  .btn.red { background: var(--accent); color: #fff; }
+  .btn.dark { background: var(--ink); color: #fff; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #tray { display: none; padding: 8px; max-width: 100%; overflow-x: auto; gap: 8px; scrollbar-width: thin; }
+  .lcard { flex: 0 0 148px; border-radius: 11px; padding: 8px 10px 9px; background: var(--soft); text-align: left; border: 2px solid transparent; position: relative; }
+  .lcard:hover { background: #e8edf2; }
+  .lcard.on { border-color: var(--accent); background: #fff; }
+  .lcard.locked { opacity: 0.5; cursor: default; }
+  .lcard svg { width: 100%; height: 44px; display: block; }
+  .lcard .n { font-weight: 700; font-size: 12.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lcard .m { color: var(--ink2); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .lcard .p { font-weight: 700; font-size: 12px; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .lcard .yr { position: absolute; top: 7px; right: 8px; font-size: 10px; font-weight: 700; color: var(--ink3); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: 0; margin-right: 5px; }
+
+  /* side panel */
+  #side { position: absolute; right: 12px; top: 96px; bottom: 54px; width: 342px; display: flex; flex-direction: column; overflow: hidden; }
+  #tabs { display: flex; padding: 6px 6px 0; gap: 2px; border-bottom: 1px solid var(--line); }
+  #tabs button { flex: 1; padding: 8px 0 9px; font-weight: 650; color: var(--ink3); border-bottom: 2px solid transparent; font-size: 12.5px; }
+  #tabs button.on { color: var(--ink); border-color: var(--accent); }
+  #sidebody { padding: 12px 14px 16px; overflow-y: auto; flex: 1; scrollbar-width: thin; }
+  #sidebody h3 { margin: 0 0 6px; font-size: 15px; }
+  #sidebody h5 { margin: 16px 0 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink3); }
+  #sidebody p { margin: 0 0 8px; color: var(--ink2); }
+  .goalcard { background: linear-gradient(160deg, #fff, #f3f6f9); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .goalcard .dl { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+  .prog { margin-top: 8px; }
+  .prog .l { display: flex; justify-content: space-between; font-size: 12px; }
+  .prog .l b { font-variant-numeric: tabular-nums; }
+  .bar { height: 6px; border-radius: 6px; background: #e3e8ee; overflow: hidden; margin-top: 3px; }
+  .bar i { display: block; height: 100%; background: var(--blue); border-radius: 6px; }
+  .bar i.ok { background: var(--good); }
+  .kv { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--line); font-variant-numeric: tabular-nums; }
+  .kv:last-child { border-bottom: 0; }
+  .kv span { color: var(--ink2); } .kv b.neg { color: var(--accent); } .kv b.pos { color: var(--good); }
+  .item { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .item:last-child { border-bottom: 0; }
+  .item .tx { flex: 1; min-width: 0; }
+  .item .tx b { display: block; }
+  .item .tx small { color: var(--ink2); display: block; }
+  .item.dim { opacity: 0.5; }
+  .item.click { cursor: pointer; } .item.click:hover { background: var(--soft); margin: 0 -8px; padding: 8px; border-radius: 8px; }
+  .tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--soft); color: var(--ink2); white-space: nowrap; }
+  .tag.good { background: #dff3e8; color: var(--good); } .tag.bad { background: #fde5e2; color: var(--accent); } .tag.warn { background: #fdf0d8; color: var(--warn); }
+  .warnbox { background: #fff6e2; border: 1px solid #f3dca6; color: #7a5200; border-radius: 10px; padding: 8px 10px; margin-top: 8px; cursor: pointer; }
+  .share { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+  .share .nm { width: 96px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .share .bar { flex: 1; margin: 0; height: 9px; }
+  .share .pc { width: 40px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .pricebox { background: var(--soft); border-radius: 10px; padding: 10px 12px; }
+  .pricebox .big { font-size: 22px; font-weight: 750; font-variant-numeric: tabular-nums; }
+
+  #views { position: absolute; right: 12px; bottom: 12px; width: 342px; display: flex; gap: 4px; padding: 5px; }
+  #views button { flex: 1; padding: 6px 4px; border-radius: 8px; font-weight: 650; color: var(--ink2); font-size: 11.5px; }
+  #views button.on { background: var(--ink); color: #fff; }
+  #views button:hover:not(.on) { background: var(--soft); }
+
+  #toasts { position: absolute; left: 90px; top: 96px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; max-width: 420px; }
+  .toast { background: rgba(22,33,44,0.92); color: #fff; padding: 8px 12px; border-radius: 10px; box-shadow: var(--shadow); animation: tin 0.25s ease-out; font-weight: 550; }
+  .toast.good { background: rgba(22,120,74,0.95); } .toast.warn { background: rgba(190,70,40,0.96); }
+  @keyframes tin { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+  /* modal */
+  #modal { position: fixed; inset: 0; background: rgba(18,28,40,0.42); display: grid; place-items: center; z-index: 10; backdrop-filter: blur(3px); }
+  #modal.hidden { display: none; }
+  .sheet { background: #fff; border-radius: 20px; width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow-y: auto; box-shadow: 0 30px 80px rgba(10,20,35,0.4); padding: 26px 28px 22px; }
+  .sheet .eyebrow { font-size: 11px; font-weight: 750; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  .sheet h1 { margin: 4px 0 8px; font-size: 28px; line-height: 1.1; letter-spacing: -0.01em; }
+  .sheet p { color: var(--ink2); font-size: 14px; margin: 0 0 10px; }
+  .sheet .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+  .sheet .tile { background: var(--soft); border-radius: 12px; padding: 10px 12px; }
+  .sheet .tile label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink3); font-weight: 650; }
+  .sheet .tile b { font-size: 19px; font-variant-numeric: tabular-nums; }
+  .sheet .tile small { display: block; color: var(--ink2); font-size: 11px; }
+  .sheet .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .sheet ul { margin: 6px 0 10px; padding-left: 18px; color: var(--ink2); font-size: 13.5px; }
+  .sheet li { margin: 3px 0; }
+  .banner { border-radius: 12px; padding: 10px 14px; margin: 10px 0; font-weight: 600; }
+  .banner.good { background: #dff3e8; color: #0f6b3f; } .banner.bad { background: #fde5e2; color: #9d2a20; } .banner.info { background: #e6f0fb; color: #1d5596; }
+  .spark { width: 100%; height: 74px; display: block; background: var(--soft); border-radius: 12px; }
+  .steps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0 4px; }
+  .steps div { background: var(--soft); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--ink2); }
+  .steps b { display: block; color: var(--ink); margin-bottom: 2px; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #dfe9f2; z-index: 20; font-size: 15px; font-weight: 650; color: var(--ink2); }
+  @media (max-width: 1100px) { .stat { min-width: 0; padding: 5px 9px; } .brand .title { display: none; } }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="labels"></div>
+<div id="hud">
+  <div id="topbar">
+    <div class="card brand">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M2 20 9 6l4 7 3-4 6 11z"/></svg></div>
+      <div><div class="title">Arlberg Pioneers</div><div class="sub" id="date">Summer 1937</div></div>
+    </div>
+    <div class="card" id="stats"></div>
+    <div class="spacer"></div>
+    <div class="card" id="controls"></div>
+  </div>
+  <div id="seasonbar"><i></i></div>
+  <div class="card" id="tools"></div>
+  <div id="toasts"></div>
+  <div id="bottom">
+    <div class="card" id="plan"></div>
+    <div class="card" id="tray"></div>
+  </div>
+  <div class="card" id="side"><div id="tabs"></div><div id="sidebody"></div></div>
+  <div class="card" id="views"></div>
+</div>
+<div id="modal" class="hidden"><div class="sheet" id="sheet"></div></div>
+<div id="loading">Surveying the Arlberg…</div>
+
+<script src="js/vendor/three.min.js"></script>
+<script src="data/terrain.js"></script>
+<script src="js/config.js"></script>
+<script src="js/terrain.js"></script>
+<script src="js/world.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/build.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
