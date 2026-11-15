@@ -124,9 +124,10 @@
 
     sky = new THREE.Mesh(new THREE.SphereGeometry(160000, 24, 12), new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { uTop: { value: new THREE.Color(0x6fa4dc) }, uHor: { value: new THREE.Color(0xdfe9f2) } },
+      uniforms: { uTop: { value: new THREE.Color(0x6fa4dc) }, uHor: { value: new THREE.Color(0xdfe9f2) }, uSun: { value: new THREE.Vector3(T.SUN[0], T.SUN[1], T.SUN[2]) }, uGlow: { value: 1 } },
       vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: 'uniform vec3 uTop; uniform vec3 uHor; varying vec3 vP; void main(){ float t = clamp(normalize(vP).y, 0.0, 1.0); gl_FragColor = vec4(mix(uHor, uTop, pow(t, 0.55)), 1.0); }',
+      fragmentShader: 'uniform vec3 uTop; uniform vec3 uHor; uniform vec3 uSun; uniform float uGlow; varying vec3 vP; void main(){ vec3 d = normalize(vP); float t = clamp(d.y, 0.0, 1.0); float s = max(dot(d, uSun), 0.0);' +
+        ' vec3 c = mix(uHor, uTop, pow(t, 0.55)); c += vec3(1.0, 0.86, 0.62) * (pow(s, 48.0) * 0.55 + pow(s, 6.0) * 0.16) * uGlow; c = mix(c, vec3(1.0, 0.95, 0.88), (1.0 - t) * (1.0 - t) * 0.25 * uGlow); gl_FragColor = vec4(c, 1.0); }',
     }));
     scene.add(sky);
 
@@ -191,7 +192,7 @@
   };
 
   // ---------------------------------------------------------------- trees (+ their shadows on the snow)
-  var treeMesh, treeCands, treeShadow;
+  var treeMesh, treeCands, treeShadow, treeCaps = null, frostNow = 0;
   function initTrees() {
     treeCands = T.treeCandidates();
     var n = treeCands.length / 4, seg = CFG.LOW ? 4 : 5;
@@ -216,6 +217,22 @@
     for (var ti = 0; ti < n; ti++) { var tv = tr(); tc.setRGB(0.78 + tv * 0.4, 0.82 + tr() * 0.36, 0.72 + tv * 0.4); treeMesh.setColorAt(ti, tc); }
     treeMesh.instanceColor.needsUpdate = true;
     scene.add(treeMesh);
+    if (!CFG.LOW) {
+      var cp = [], cn = [];
+      [new THREE.ConeGeometry(4.3, 6.6, seg, 1, true).translate(0, 11.5, 0), new THREE.ConeGeometry(3.3, 5.6, seg, 1, true).translate(0, 18.0, 0),
+        new THREE.ConeGeometry(2.3, 5.4, seg, 1, true).translate(0, 24.6, 0)].forEach(function (g) {
+        g = g.toNonIndexed();
+        var p = g.attributes.position.array, nn = g.attributes.normal.array;
+        for (var i = 0; i < p.length; i++) { cp.push(p[i]); cn.push(nn[i]); }
+      });
+      var cg = new THREE.BufferGeometry();
+      cg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(cp), 3));
+      cg.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(cn), 3));
+      treeCaps = new THREE.InstancedMesh(cg, new THREE.MeshLambertMaterial({ color: 0xf4f7fb }), n);
+      treeCaps.instanceMatrix = treeMesh.instanceMatrix;          // same trees, same places
+      treeCaps.frustumCulled = false; treeCaps.visible = false;
+      scene.add(treeCaps);
+    }
     var sg = new THREE.BufferGeometry();
     sg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 9), 3));
     treeShadow = new THREE.Mesh(sg, matShadow);
@@ -264,6 +281,7 @@
       }
     }
     treeMesh.count = c;
+    if (treeCaps) treeCaps.count = c;
     treeMesh.instanceMatrix.needsUpdate = true;
     treeShadow.geometry.setDrawRange(0, sc * 3);
     treeShadow.geometry.attributes.position.needsUpdate = true;
@@ -320,6 +338,15 @@
       wb.box(o.x, y + hgt * 0.25 - 1, o.z, w, hgt * 0.5 + 2, d, ux, uz, big ? 0xf4efe4 : 0xf1eadb);
       wb.box(o.x, y + hgt * 0.75, o.z, w + 0.5, hgt * 0.5, d + 0.5, ux, uz, wood ? (o.r < 0.25 ? 0x6e4a30 : 0x8b5e3c) : (big ? 0xe9dfca : 0xefe6d2));
       if (big) wb.box(o.x, y + hgt * 0.5, o.z, w + 1.6, 0.5, d + 1.6, ux, uz, 0x7a5236);       // balcony band
+      if (!CFG.LOW) {
+        var lit = o.r > 0.35 ? 0xf2c66a : 0x34475c;                                       // some windows glow
+        wb.box(o.x, y + hgt * 0.27, o.z, w + 0.25, 1.5, d * 0.72, ux, uz, 0x34475c);
+        wb.box(o.x, y + hgt * 0.27, o.z, w * 0.72, 1.5, d + 0.25, ux, uz, lit);
+        wb.box(o.x, y + hgt * 0.74, o.z, w + 0.8, 1.3, d * 0.66, ux, uz, lit);
+        wb.box(o.x, y + hgt * 0.74, o.z, w * 0.66, 1.3, d + 0.8, ux, uz, 0x34475c);
+        wb.box(o.x, y + hgt + 0.25, o.z, w + 2.0, 0.5, d + 2.8, ux, uz, 0x5a3d28);           // eaves
+        wb.box(o.x + ux * w * 0.22 - uz * d * 0.12, y + hgt + 3.2, o.z + uz * w * 0.22 + ux * d * 0.12, 1.5, 5.5, 1.5, ux, uz, 0x9a938a);
+      }
       rb.roof(o.x, y + hgt, o.z, w + 1.6, (big ? 2.6 : 3.2) + d * 0.1, d + 2.4, ux, uz, 0xffffff);
       if (T.shadeAt(o.x, o.z) > 0.55) {
         var L = (hgt + 3) / SUNH.tan, px = -uz * 0, hw = Math.max(w, d) * 0.5;
@@ -876,7 +903,7 @@
     flakes.material.opacity = weather === 'storm' ? 0.95 : 0.8;
     if (!!winter !== Wd.winterLook) { Wd.winterLook = !!winter; Wd.redrawDecals(); }
   };
-  var cTreeS = new THREE.Color(0x2f5a2c), cTreeW = new THREE.Color(0x6f9483), cRoofS = new THREE.Color(0x6b4a3a), cRoofW = new THREE.Color(0xf6f8fb);
+  var cTreeS = new THREE.Color(0x2f5a2c), cTreeW = new THREE.Color(0x4f7a5e), cRoofS = new THREE.Color(0x6b4a3a), cRoofW = new THREE.Color(0xf6f8fb);
   function updateLook(dt) {
     var k = 1 - Math.exp(-dt * 1.6);
     look.snow += (goal.snow - look.snow) * k; look.fog += (goal.fog - look.fog) * k; look.sunI += (goal.sunI - look.sunI) * k;
@@ -889,9 +916,11 @@
     u.uAmbCol.value.set(a, a + 0.06 - (1 - look.sunI) * 0.03, a + 0.19 - (1 - look.sunI) * 0.12);
     scene.fog.density = look.fog; scene.fog.color.copy(look.hor);
     sky.material.uniforms.uTop.value.copy(look.top); sky.material.uniforms.uHor.value.copy(look.hor);
+    sky.material.uniforms.uGlow.value = Math.max(0, (look.sunI - 0.3) / 0.7);
+    if (treeCaps) treeCaps.visible = frostNow > 0.35;
     sun.intensity = 2.6 * look.sunI; amb.intensity = 1.9 + (1 - look.sunI) * 0.8;
     matShadow.opacity = 0.34 * Math.max(0, (look.sunI - 0.3) / 0.7);
-    var frost = look.winter * T.sstep(2100, 1500, look.snow);
+    var frost = look.winter * T.sstep(2100, 1500, look.snow); frostNow = frost;
     matTree.color.copy(cTreeS).lerp(cTreeW, frost * 0.85);
     matRoof.color.copy(cRoofS).lerp(cRoofW, look.winter * T.sstep(1900, 1400, look.snow));
     if (flakes.visible) {

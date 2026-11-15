@@ -111,9 +111,9 @@
 
   // ---- mesh ---------------------------------------------------------------
   var VERT = [
-    'attribute float aShade; attribute float aForest;',
-    'varying float vH; varying vec3 vN; varying float vShade; varying float vForest; varying vec2 vUv2; varying vec3 vW; varying float vDist;',
-    'void main(){ vH = position.y; vN = normal; vShade = aShade; vForest = aForest; vUv2 = uv; vW = position;',
+    'attribute float aShade; attribute float aForest; attribute float aAO;',
+    'varying float vH; varying vec3 vN; varying float vShade; varying float vForest; varying vec2 vUv2; varying vec3 vW; varying float vDist; varying float vAO;',
+    'void main(){ vAO = aAO; vH = position.y; vN = normal; vShade = aShade; vForest = aForest; vUv2 = uv; vW = position;',
     ' vec4 mv = modelViewMatrix * vec4(position,1.0); vDist = length(mv.xyz); gl_Position = projectionMatrix * mv; }'
   ].join('\n');
 
@@ -122,7 +122,7 @@
     'uniform sampler2D uPiste; uniform sampler2D uDecal; uniform vec3 uSun; uniform float uSnowline; uniform float uSmLine; uniform vec3 uFogColor; uniform float uFogDensity;',
     'uniform float uContour; uniform float uOverlay; uniform vec3 uHubs[' + T.MAXHUBS + ']; uniform float uShowHubs; uniform vec3 uZones[' + T.MAXZONES + '];',
     'uniform vec3 uSunCol; uniform vec3 uAmbCol; uniform float uTime;',
-    'varying float vH; varying vec3 vN; varying float vShade; varying float vForest; varying vec2 vUv2; varying vec3 vW; varying float vDist;',
+    'varying float vH; varying vec3 vN; varying float vShade; varying float vForest; varying vec2 vUv2; varying vec3 vW; varying float vDist; varying float vAO;',
     'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }',
     'float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);',
     ' return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }',
@@ -176,9 +176,11 @@
     // light
     ' float nl = max(dot(N, uSun), 0.0);',
     ' float lit = nl * vShade;',
-    ' vec3 light = uAmbCol * (0.80 + 0.20 * N.y) + uSunCol * lit;',
+    ' vec3 light = uAmbCol * (0.80 + 0.20 * N.y) * vAO + uSunCol * lit * (0.72 + 0.28 * vAO);',
+    ' light += uSunCol * 0.10 * snowAmt * pow(1.0 - N.y, 2.0) * vShade;',          // a warm rim where snow rolls away from the eye
     ' col *= light;',
     ' float fog = 1.0 - exp(-uFogDensity * uFogDensity * vDist * vDist);',
+    ' fog = max(fog, (1.0 - smoothstep(1050.0, 2050.0, vH)) * smoothstep(2500.0, 16000.0, vDist) * 0.30);',   // haze pools in the valleys
     ' col = mix(col, uFogColor, clamp(fog, 0.0, 1.0));',
     ' gl_FragColor = vec4(col, 1.0);',
     '}'
@@ -187,7 +189,7 @@
   T.buildMesh = function (pisteTexture, decalTexture) {
     var n = W * H;
     var pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
-    var forest = new Float32Array(n);
+    var forest = new Float32Array(n), ao = new Float32Array(n);
     var shade = bakeShade();
     for (var j = 0; j < H; j++) {
       for (var i = 0; i < W; i++) {
@@ -199,6 +201,14 @@
         nor[k * 3] = nx / l; nor[k * 3 + 1] = 1 / l; nor[k * 3 + 2] = nz / l;
         uv[k * 2] = i / (W - 1); uv[k * 2 + 1] = j / (H - 1);
         forest[k] = T.forestAt(x, z);
+        // ambient occlusion from the shape of the land: gullies and valley floors sit darker, ridges brighter
+        var sum = 0, cnt = 0;
+        for (var R = 3; R <= 9; R += 6) for (var dj = -1; dj <= 1; dj++) for (var di = -1; di <= 1; di++) {
+          if (!di && !dj) continue;
+          var ii = Math.min(W - 1, Math.max(0, i + di * R)), jj = Math.min(H - 1, Math.max(0, j + dj * R));
+          sum += (hgt[jj * W + ii] - hgt[k]) / (R * T.dx); cnt++;
+        }
+        ao[k] = 1 - Math.min(0.42, Math.max(-0.10, sum / cnt * 1.5));
       }
     }
     var idx = new Uint32Array((W - 1) * (H - 1) * 6), p = 0;
@@ -214,6 +224,7 @@
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geo.setAttribute('aShade', new THREE.BufferAttribute(shade, 1));
     geo.setAttribute('aForest', new THREE.BufferAttribute(forest, 1));
+    geo.setAttribute('aAO', new THREE.BufferAttribute(ao, 1));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeBoundingSphere();
     T.shade = shade;

@@ -54,10 +54,13 @@ awareness, campaigns, ticket price; free-play buttons (jump years, add money).
 - One figure stands for several guests when the resort is large (`season.scale`).
 - Balance was only checked with a crude computer player (`aiYear`).
 - Not tested on a real phone; frame rate never measured in a real browser.
+- Light graphics (`CFG.LOW`) switch on automatically for phones and small screens: no tree snow caps,
+  no house windows / chimneys, fewer trees, half-resolution terrain. Test detail work with `?high=1`.
 
 ## Backlog (owner's requests, not done yet)
 
-**Graphics — the main one.** Every asset more detailed: trees, chalets and hotels, skiers,
+**Graphics — the main one.** A first pass is in (terrain ambient occlusion, valley haze, sun glow,
+snow-capped three-tier trees, chalets with window rows, eaves and chimneys). Still to do — every asset more detailed: trees, chalets and hotels, skiers,
 lift stations, towers, chairs and cabins, piste edges. Target look: playsnowmount.com.
 
 **Feel.** Less instructive (drop the getting-started steps and pre-opening warnings or put them
