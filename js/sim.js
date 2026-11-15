@@ -49,6 +49,20 @@
     s.phase = 'summer';
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch (e) { /* storage unavailable */ }
   };
+  Sim.exportText = function () { Sim.save(); try { return localStorage.getItem(SAVE_KEY); } catch (e) { return null; } };
+  Sim.importText = function (t) {
+    var s; try { s = JSON.parse(t); } catch (e) { return 'That file is not a saved game.'; }
+    if (!s || s.v !== 3 || !s.lifts) return 'That file is not a saved game of this version.';
+    try { localStorage.setItem(SAVE_KEY, t); } catch (e) { return 'The browser refused to store the game.'; }
+    return null;
+  };
+  // free play: skip ahead to try later technology
+  Sim.jumpYears = function (n) {
+    if (G.phase !== 'summer') return 'Wait for summer.';
+    G.year = Math.min(2060, G.year + n); G.freeplay = true; G.crewLeft = Sim.crewMax(); G.campaignsUsed = {};
+    Sim.syncVillages();
+    return null;
+  };
   Sim.hasSave = function () { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } };
   Sim.load = function () {
     var raw, s;
@@ -664,7 +678,7 @@
     Sim.rebuildGraph();
     var m = Sim.metrics(), mk = Sim.market(m);
     var est = Math.min(mk.size * mk.share * 1.7, Sim.capacity());
-    S.scale = Math.max(3, Math.ceil(est / (CFG.MAX_AGENTS * 0.85)));
+    S.scale = Math.max(1, Math.ceil(est / (CFG.MAX_AGENTS * 0.85)));
     S.dayAcc = CFG.DAY_SEC;
     Sim.update(0.0001);
   };

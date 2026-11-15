@@ -7,7 +7,7 @@ window.SK = window.SK || {};
     START_YEAR: 1937,
     START_MONEY: 480000,
     SEASON_DAYS: 120,          // Dec 1 .. Mar 30
-    DAY_SEC: 1.2,              // real seconds per game day at 1x
+    DAY_SEC: 0.7,              // real seconds per game day at 1x
     SNAP: 110,                 // metres: endpoints closer than this connect
     HUB_RADIUS: 360,           // metres: valley station zone around a village
     MAX_AGENTS: 1300,

@@ -195,7 +195,7 @@
   B.pickObject = function (p) {
     var G = SK.G, best = null, bd = Math.max(70, Wd.cam.dist / 90);
     G.huts.forEach(function (h) { var d = Math.hypot(h.x - p.x, h.z - p.z) * 0.6; if (d < bd) { bd = d; best = { kind: 'hut', obj: h }; } });
-    (G.zones || []).forEach(function (zn) { var d = Math.abs(Math.hypot(zn.x - p.x, zn.z - p.z) - zn.r) * 0.7; if (d < bd) { bd = d; best = { kind: 'zone', obj: zn }; } });
+    (G.zones || []).forEach(function (zn) { var d = Math.hypot(zn.x - p.x, zn.z - p.z) < zn.r ? Math.min(60, bd * 0.9) : 1e9; if (d < bd) { bd = d; best = { kind: 'zone', obj: zn }; } });   // anywhere inside the zone; lifts and pistes closer to the click still win
     G.lifts.forEach(function (l) { var d = distSeg(p.x, p.z, l.a.x, l.a.z, l.b.x, l.b.z) * 0.8; if (d < bd) { bd = d; best = { kind: 'lift', obj: l }; } });
     G.pistes.forEach(function (ps) {
       for (var i = 0; i < ps.pts.length; i += 2) { var d = Math.hypot(ps.pts[i].x - p.x, ps.pts[i].z - p.z); if (d < bd) { bd = d; best = { kind: 'piste', obj: ps }; } }

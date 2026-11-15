@@ -148,7 +148,8 @@
     // pistes: R = groomed core, G = snowmaking
     ' vec4 P = texture2D(uPiste, vUv2);',
     ' float core = P.r;',
-    ' float pSnow = max(hs, step(0.5, P.g) * step(uSmLine, vH + 5.0));',
+    ' float hp = smoothstep(uSnowline - 430.0, uSnowline - 270.0, hEff);',       // the groomed base outlasts the snow beside it
+    ' float pSnow = max(max(hs, hp), step(0.5, P.g) * step(uSmLine, vH + 5.0));',
     ' vec3 pGrass = mix(summer, vec3(0.70,0.72,0.47), 0.7);',
     ' float cord = 0.985 + 0.03 * step(0.5, fract((vW.x + vW.z) / 9.0));',
     ' vec3 coreCol = mix(pGrass, vec3(0.925,0.955,1.0) * cord, pSnow);',

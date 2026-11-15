@@ -195,7 +195,8 @@
   function initTrees() {
     treeCands = T.treeCandidates();
     var n = treeCands.length / 4, seg = CFG.LOW ? 4 : 5;
-    var parts = [new THREE.ConeGeometry(7, 16, seg, 1, true).translate(0, 9.5, 0), new THREE.ConeGeometry(4.8, 13, seg, 1, true).translate(0, 18.5, 0)];
+    var parts = [new THREE.ConeGeometry(7.4, 13, seg, 1, true).translate(0, 8, 0), new THREE.ConeGeometry(5.6, 11, seg, 1, true).translate(0, 15, 0),
+      new THREE.ConeGeometry(3.6, 10, seg, 1, true).translate(0, 22, 0)];
     var pos = [], nor = [], col = [];
     parts.forEach(function (g) {
       g = g.toNonIndexed();
@@ -211,6 +212,9 @@
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
     treeMesh = new THREE.InstancedMesh(geo, matTree, n);
     treeMesh.frustumCulled = false;
+    var tc = new THREE.Color(), tr = SK.rng(77);                      // every tree its own shade of green
+    for (var ti = 0; ti < n; ti++) { var tv = tr(); tc.setRGB(0.78 + tv * 0.4, 0.82 + tr() * 0.36, 0.72 + tv * 0.4); treeMesh.setColorAt(ti, tc); }
+    treeMesh.instanceColor.needsUpdate = true;
     scene.add(treeMesh);
     var sg = new THREE.BufferGeometry();
     sg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 9), 3));
@@ -640,7 +644,7 @@
     lines.frustumCulled = false;
     grp.add(lines);
     // vehicles
-    var n = ty.style === 'tram' ? 2 : Math.max(2, Math.floor(2 * g.len / ty.spacing));
+    var n = ty.style === 'tram' ? 2 : Math.max(2, Math.floor(2 * g.len / (ty.spacing * 0.62)));
     var veh = new THREE.InstancedMesh(vehicleGeo(ty), matSolid, n);
     veh.frustumCulled = false;
     grp.add(veh);

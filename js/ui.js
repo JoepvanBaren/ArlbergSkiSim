@@ -90,6 +90,20 @@
     if (act === 'speed') { Sim.paused = d.v === '0'; if (!Sim.paused) Sim.speed = +d.v; UI.refreshControls(); return; }
     if (act === 'skip') { Sim.paused = false; Sim.speed = 40; UI.refreshControls(); return; }
     if (act === 'confirm') { B.confirm(); return; }
+    if (act === 'zone-r') { B.zoneR = Math.max(100, Math.min(900, B.zoneR + (+d.n))); if (B.plan && B.plan.kind === 'zone') B.plan.r = B.zoneR; B.redraw(); UI.refreshPlan(); return; }
+    if (act === 'export') {
+      var txt = Sim.exportText(); if (!txt) { UI.toast('Nothing to export.', 'warn'); return; }
+      var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'application/json' }));
+      a.download = 'arlberg-' + G.year + '.json'; document.body.appendChild(a); a.click(); a.remove();
+      UI.toast('Game exported to your downloads.', 'good'); return;
+    }
+    if (act === 'import') {
+      var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+      inp.onchange = function () { var f = inp.files[0]; if (!f) return; var rd = new FileReader(); rd.onload = function () { var er = Sim.importText(String(rd.result)); if (er) UI.toast(er, 'warn'); else { SK.continueGame(); UI.toast('Game loaded.', 'good'); } }; rd.readAsText(f); };
+      inp.click(); return;
+    }
+    if (act === 'jump') { var je = Sim.jumpYears(+d.n); if (je) UI.toast(je, 'warn'); else UI.toast('It is now ' + G.year + '.', 'good'); UI.refreshAll(); return; }
+    if (act === 'cash') { G.money += 10000000; G.freeplay = true; UI.refreshAll(); return; }
     if (act === 'undo') { B.undoPoint(); return; }
     if (act === 'finish') { B.finishPiste(); return; }
     if (act === 'cancel') { B.cancel(); return; }
@@ -244,7 +258,7 @@
       h = '<h4>Mountain hut</h4>' + (pl && pl.kind === 'hut' ? '<div class="row"><span>Cost <b>' + M(pl.cost) + '</b></span><span>Build <b>3 wk</b></span><span>Earns about <b>€3.40</b> per guest it can serve (700 a day)</span></div>' +
         (pl.error ? '<div class="err">' + pl.error + '</div>' : (B.pending ? '' : '<div class="ok">Click to build.</div>')) + go : '<div class="hint">Place it on flat ground next to a piste. Guests are a little happier, and hungrier.</div>');
     } else if (B.tool === 'zone') {
-      h = '<h4>No-go zone</h4><div class="hint">Mark an area nobody may enter: pistes and routes through it close, and freeriders stay off the slope. Red rings show avalanche slopes freeriders can reach from your lifts. ' + G.zones.length + ' / ' + T.MAXZONES + ' zones.</div>' + go;
+      h = '<h4>No-go zone</h4><div class="hint">Mark an area nobody may enter: pistes and routes through it close, and freeriders stay off the slope. Red rings show avalanche slopes freeriders can reach from your lifts. ' + G.zones.length + ' / ' + T.MAXZONES + ' zones.</div><div class="acts"><span class="lbl">Size ' + B.zoneR + ' m</span><button class="btn" data-act="zone-r" data-n="-60">Smaller</button><button class="btn" data-act="zone-r" data-n="60">Bigger</button></div>' + go;
     } else if (B.tool === 'demolish') {
       h = '<h4>Remove</h4><div class="hint">' + (Wd.touch ? 'Tap' : 'Click') + ' a lift, piste, hut or no-go zone to remove it. Lifts return 15% scrap value.</div>';
     } else if (B.sel) h = selectionHtml();
@@ -345,7 +359,9 @@
       h += '<h5>Chapters</h5>';
       done.forEach(function (g) { h += '<div class="item"><div class="tx"><b>' + g.title + '</b><small>by ' + (g.by + 1) + '</small></div><span class="tag ' + (G.goals[g.id] === 'done' ? 'good">achieved' : 'bad">missed') + '</span></div>'; });
     }
-    h += '<h5>Controls</h5><p>Mouse: drag to move · right-drag to rotate · wheel to zoom. Touch: one finger moves, pinch zooms, twist rotates, two fingers up/down tilt, long-press undoes.</p><button class="btn" data-act="newgame">New game…</button>';
+    h += '<h5>Controls</h5><p>Mouse: drag to move · right-drag to rotate · wheel to zoom. Touch: one finger moves, pinch zooms, twist rotates, two fingers up/down tilt, long-press undoes.</p><button class="btn" data-act="newgame">New game…</button>' +
+      '<h5>Save file</h5><div style="display:flex;gap:6px"><button class="btn" data-act="export">Export game</button><button class="btn" data-act="import">Import game</button></div>' +
+      '<h5>Free play</h5><p>Skip ahead to try later technology. Goals still run, but this is no longer a fair story game.</p><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-act="jump" data-n="1">+1 year</button><button class="btn" data-act="jump" data-n="10">+10 years</button><button class="btn" data-act="jump" data-n="40">+40 years</button><button class="btn" data-act="cash">+ €10M</button></div>';
     return h;
   }
 
