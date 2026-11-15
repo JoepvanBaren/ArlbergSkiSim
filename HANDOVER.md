@@ -8,7 +8,7 @@ Arlberg Pioneers is a browser ski-resort tycoon (plain HTML + JavaScript + three
 on the real terrain of the Arlberg: St. Anton, St. Christoph, Stuben, Zürs, Lech, Warth, Schröcken.
 You are general manager from 1937 into the future: build lifts and pistes in summer, run the
 winter (snow, wind, breakdowns, avalanches, staff), read the spring report, chase chapter goals.
-Repo: https://github.com/JoepvanBaren/AlrbergSkiSim — open `index.html` to play. The owner wants
+Repo: https://github.com/JoepvanBaren/ArlbergSkiSim — open `index.html` to play. The owner wants
 it to look far less like a prototype (reference: playsnowmount.com, Planet Coaster, RCT3) and to
 feel quicker and less instructive. Next work is listed under "Backlog" in `HANDOVER.md`.
 
