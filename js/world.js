@@ -659,6 +659,9 @@
       b.box(0, -5.0 * s, 0, w, 0.36 * s, 1.5 * s, 1, 0, 0x2b3036);                      // seat
       b.box(0, -4.25 * s, -0.7 * s, w, 1.4 * s, 0.3 * s, 1, 0, c);                       // backrest
       b.box(0, -5.9 * s, 0.9 * s, w, 0.14 * s, 0.2 * s, 1, 0, 0x4a4f57);                // footrest
+      b.box(0, -3.9 * s, 0.75 * s, w, 0.12 * s, 0.12 * s, 1, 0, 0xb9c0c6);              // safety bar
+      b.box(0, -5.15 * s, 0.05 * s, w * 0.96, 0.2 * s, 1.3 * s, 1, 0, 0x7a2f2a);         // seat cushion
+      b.box(0, 0.25 * s, 0, 0.5 * s, 0.5 * s, 1.1 * s, 1, 0, 0x2b3036);                 // grip
       if (ty.bubble) { b.hull(0, -4.3 * s, 0, w, 2.2 * s, 1.6 * s, 1, 0, c, 5); }
     } else if (ty.style === 'gondola') {
       var k = ty.big ? 1.9 : (ty.twin ? 1.5 : (ty.seats >= 8 ? 1.2 : 1));
@@ -666,6 +669,10 @@
       b.box(0, -2.3 * s * k, 0, 2.4 * s * k, 0.5 * s * k, 3.0 * s * k, 1, 0, 0xe9edf0, 0.8);    // roof
       b.box(0, -3.5 * s * k, 0, 3.0 * s * k, 2.0 * s * k, 3.6 * s * k, 1, 0, 0x1d2731);          // glass
       b.box(0, -5.2 * s * k, 0, 3.05 * s * k, 1.5 * s * k, 3.65 * s * k, 1, 0, c);                // body
+      b.box(0, -3.5 * s * k, 0, 0.22 * s * k, 2.0 * s * k, 3.66 * s * k, 1, 0, c);               // window posts
+      b.box(0, -3.5 * s * k, 0, 3.06 * s * k, 2.0 * s * k, 0.22 * s * k, 1, 0, c);
+      b.box(0, -3.5 * s * k, 1.2 * s * k, 3.07 * s * k, 2.0 * s * k, 0.12 * s * k, 1, 0, 0xe9edf0);
+      b.box(0, -6.05 * s * k, 0, 2.5 * s * k, 0.25 * s * k, 3.2 * s * k, 1, 0, 0x30343a);       // floor skid
       b.box(1.6 * s * k, -4.4 * s * k, 0, 0.2 * s * k, 2.4 * s * k, 1.6 * s * k, 1, 0, 0x8f989f); // ski rack
     } else if (ty.style === 'tram') {
       b.box(0, -2.2 * s, 0, 0.6 * s, 4.4 * s, 0.6 * s, 1, 0, 0x4a4f57);
@@ -695,6 +702,16 @@
       } else b.cyl(x, t.g - 3, z, ty.style === 'surface' ? 0.6 : 1.25, t.h + 3, ty.style === 'pod' ? 0xf0f4f7 : 0x97a0a7, 0.65, 7);
       b.box(x, t.g + t.h + 0.5, z, 1.4, 1.2, gauge + 3.4, g.ux, g.uz, 0x6f787f);
       if (ty.style !== 'surface' && ty.style !== 'pod') {             // sheave trains
+        var wsp = heavy ? 2.4 : 1.4;
+        for (var wq = -1; wq <= 1; wq += 2) for (var wk = -2; wk <= 2; wk++) {            // the yellow sheave wheels
+          var wx = x - g.uz * gauge / 2 * wq + g.ux * wk * wsp, wz = z + g.ux * gauge / 2 * wq + g.uz * wk * wsp;
+          b.box(wx, t.g + t.h - 0.5, wz, 1.0, 1.0, 0.4, g.ux, g.uz, 0xe0b23a);
+          b.box(wx, t.g + t.h - 0.5, wz, 0.4, 0.4, 0.5, g.ux, g.uz, 0x2b3036);
+        }
+        b.box(x, t.g + t.h + 1.45, z, 1.1, 0.2, gauge + 5.5, g.ux, g.uz, 0x8a939b);          // catwalk and railing
+        b.box(x + g.ux * 0.55, t.g + t.h + 2.1, z + g.uz * 0.55, 0.1, 1.1, gauge + 5.5, g.ux, g.uz, 0xb9c0c6);
+        b.box(x + g.ux * 1.5, t.g + t.h * 0.5, z + g.uz * 1.5, 0.2, t.h, 0.75, g.ux, g.uz, 0xb9c0c6);   // ladder
+        b.box(x - g.ux * 1.4, t.g + 4.5, z - g.uz * 1.4, 0.15, 1.6, 1.6, g.ux, g.uz, 0xf2c230);        // tower number plate
         b.box(x - g.uz * gauge / 2, t.g + t.h + 0.2, z + g.ux * gauge / 2, heavy ? 12 : 7, 0.9, 1, g.ux, g.uz, 0x3d444b);
         b.box(x + g.uz * gauge / 2, t.g + t.h + 0.2, z - g.ux * gauge / 2, heavy ? 12 : 7, 0.9, 1, g.ux, g.uz, 0x3d444b);
       }

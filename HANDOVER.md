@@ -60,7 +60,9 @@ awareness, campaigns, ticket price; free-play buttons (jump years, add money).
 ## Backlog (owner's requests, not done yet)
 
 **Graphics — the main one.** A first pass is in (terrain ambient occlusion, valley haze, sun glow,
-snow-capped three-tier trees, chalets with window rows, eaves and chimneys). Still to do — every asset more detailed: trees, chalets and hotels, skiers,
+snow-capped three-tier trees, houses with window grids, balconies, doors, eaves and chimneys; roads,
+railway, rivers and piste edges drawn as geometry (`Wd.rebuildLines`) so they stay sharp; zoom down to
+110 m; lift towers with sheave wheels, catwalk and ladder; cabins with window posts). Still to do — every asset more detailed: trees, chalets and hotels, skiers,
 lift stations, towers, chairs and cabins, piste edges. Target look: playsnowmount.com.
 
 **Feel.** Less instructive (drop the getting-started steps and pre-opening warnings or put them
