@@ -694,6 +694,26 @@
     var gauge = GAUGE[ty.style] * (ty.big ? 1.5 : 1), heavy = ty.style === 'tram' || ty.big;
     station(b, lift.a, g.ux, g.uz, ty, false);
     station(b, lift.b, g.ux, g.uz, ty, true);
+    [lift.a, lift.b].forEach(function (p, ti) {                       // what every station has: platform, control booth, sign, lights, gates
+      var ux = g.ux, uz = g.uz, sg = ti ? -1 : 1, y = p.y, sx = -uz, sz = ux;
+      b.box(p.x, y + 0.25, p.z, 26, 0.5, gauge + 12, ux, uz, 0xc9ced3);                                     // loading platform
+      b.box(p.x + ux * sg * 12.5, y + 0.6, p.z + uz * sg * 12.5, 0.6, 0.25, gauge + 12, ux, uz, 0xf2c230);  // yellow edge line
+      var bx = p.x + sx * (gauge / 2 + 8), bz = p.z + sz * (gauge / 2 + 8);
+      b.box(bx, y + 2.2, bz, 5, 4.4, 4, ux, uz, 0xe9edf0); b.box(bx, y + 4.6, bz, 5.8, 0.4, 4.8, ux, uz, 0xf7f9fb);
+      b.pane(bx, y + 2.9, bz, ux, uz, 0, 2.03, 3.6, 1.6, 'z', 1, 0x2f4257); b.pane(bx, y + 2.9, bz, ux, uz, 0, 2.03, 3.6, 1.6, 'z', -1, 0x2f4257);
+      b.pane(bx, y + 2.9, bz, ux, uz, 0, 2.53, 2.8, 1.6, 'x', 1, 0x2f4257); b.pane(bx, y + 2.9, bz, ux, uz, 0, 2.53, 2.8, 1.6, 'x', -1, 0xf6cd72);
+      var gx = p.x - sx * (gauge / 2 + 7) - ux * sg * 6, gz = p.z - sz * (gauge / 2 + 7) - uz * sg * 6;   // name board on two posts
+      b.box(gx - ux * 3, y + 3, gz - uz * 3, 0.3, 6, 0.3, ux, uz, 0x4a4f57); b.box(gx + ux * 3, y + 3, gz + uz * 3, 0.3, 6, 0.3, ux, uz, 0x4a4f57);
+      b.box(gx, y + 5.4, gz, 7.5, 2.2, 0.3, ux, uz, ty.color); b.box(gx, y + 5.4, gz, 6.6, 0.5, 0.36, ux, uz, 0xffffff);
+      for (var q = -1; q <= 1; q += 2) {                                                                    // floodlight masts
+        var mx = p.x + sx * q * (gauge / 2 + 5) + ux * sg * 10, mz = p.z + sz * q * (gauge / 2 + 5) + uz * sg * 10;
+        b.cyl(mx, y, mz, 0.22, 9, 0x6f787f, 0.8, 5); b.box(mx, y + 9.2, mz, 1.8, 0.5, 0.9, ux, uz, 0xfff3c4);
+      }
+      if (!ti) for (q = -2; q <= 2; q++) {                                                                  // ticket gates at the valley station
+        var tx = p.x - ux * 18 + sx * q * 2.4, tz = p.z - uz * 18 + sz * q * 2.4, th = T.heightAt(tx, tz);
+        b.box(tx, th + 0.7, tz, 1.2, 1.4, 0.5, ux, uz, 0x3a4652); b.box(tx, th + 1.5, tz, 0.5, 0.25, 0.5, ux, uz, 0x35e07a);
+      }
+    });
     g.towers.forEach(function (t) {
       var x = a.x + g.ux * t.d, z = a.z + g.uz * t.d;
       if (heavy) {
