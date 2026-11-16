@@ -87,6 +87,17 @@
     }
     return this;
   };
+  // a flat rectangle on a wall: axis 'z' = on the long side, 'x' = on the gable end
+  Batch.prototype.pane = function (cx, cy, cz, ux, uz, a, off, pw, ph, axis, sign, color) {
+    _col.set(color);
+    var ids = [], me = this, hw = pw / 2, hh = ph / 2;
+    [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(function (q) {
+      if (axis === 'z') ids.push(me.vert(cx, cy, cz, a + q[0], q[1], off * sign, ux, uz, 0, 0, sign));
+      else ids.push(me.vert(cx, cy, cz, off * sign, q[1], a + q[0], ux, uz, sign, 0, 0));
+    });
+    this.i.push(ids[0], ids[1], ids[2], ids[0], ids[2], ids[3]);
+    return this;
+  };
   Batch.prototype.build = function () {
     var g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.p), 3));
@@ -339,11 +350,26 @@
       wb.box(o.x, y + hgt * 0.75, o.z, w + 0.5, hgt * 0.5, d + 0.5, ux, uz, wood ? (o.r < 0.25 ? 0x6e4a30 : 0x8b5e3c) : (big ? 0xe9dfca : 0xefe6d2));
       if (big) wb.box(o.x, y + hgt * 0.5, o.z, w + 1.6, 0.5, d + 1.6, ux, uz, 0x7a5236);       // balcony band
       if (!CFG.LOW) {
-        var lit = o.r > 0.35 ? 0xf2c66a : 0x34475c;                                       // some windows glow
-        wb.box(o.x, y + hgt * 0.27, o.z, w + 0.25, 1.5, d * 0.72, ux, uz, 0x34475c);
-        wb.box(o.x, y + hgt * 0.27, o.z, w * 0.72, 1.5, d + 0.25, ux, uz, lit);
-        wb.box(o.x, y + hgt * 0.74, o.z, w + 0.8, 1.3, d * 0.66, ux, uz, lit);
-        wb.box(o.x, y + hgt * 0.74, o.z, w * 0.66, 1.3, d + 0.8, ux, uz, 0x34475c);
+        var floors = big ? 4 : (hgt > 10 ? 3 : 2), fh = hgt / floors, nW = Math.max(2, Math.floor(w / 3.1)), nD = Math.max(1, Math.floor(d / 3.3));
+        for (var f = 0; f < floors; f++) {
+          var wy = y + fh * (f + 0.56), off = (f * 2 >= floors ? 0.3 : 0.05);
+          for (var q = 0; q < nW; q++) {
+            var lx = (q + 0.5) / nW * w - w / 2, c1 = ((idx + q * 3 + f) % 4 === 0) ? 0xf6cd72 : 0x2f4257, c2 = ((idx + q + f * 2) % 5 === 0) ? 0xf6cd72 : 0x2f4257;
+            if (!(f === 0 && q === (nW >> 1))) wb.pane(o.x, wy, o.z, ux, uz, lx, d / 2 + off, 1.25, 1.45, 'z', 1, c1);
+            wb.pane(o.x, wy, o.z, ux, uz, lx, d / 2 + off, 1.25, 1.45, 'z', -1, c2);
+            wb.pane(o.x, wy - 0.95, o.z, ux, uz, lx, d / 2 + off + 0.02, 1.7, 0.22, 'z', 1, 0xe9e2d2);       // sill
+          }
+          for (q = 0; q < nD; q++) {
+            var lz = (q + 0.5) / nD * d - d / 2;
+            wb.pane(o.x, wy, o.z, ux, uz, lz, w / 2 + off, 1.25, 1.45, 'x', 1, 0x2f4257);
+            wb.pane(o.x, wy, o.z, ux, uz, lz, w / 2 + off, 1.25, 1.45, 'x', -1, ((idx + q) % 3 === 0) ? 0xf6cd72 : 0x2f4257);
+          }
+          if (f > 0 && (big || (wood && f === floors - 1))) {                                           // balconies with a railing
+            wb.box(o.x - uz * (d / 2 + 0.8), y + fh * f + 0.1, o.z + ux * (d / 2 + 0.8), w * 0.92, 0.22, 1.5, ux, uz, 0x6e4a30);
+            wb.box(o.x - uz * (d / 2 + 1.5), y + fh * f + 0.7, o.z + ux * (d / 2 + 1.5), w * 0.92, 1.0, 0.14, ux, uz, 0x7d5536);
+          }
+        }
+        wb.pane(o.x, y + 1.15, o.z, ux, uz, ((nW >> 1) + 0.5) / nW * w - w / 2, d / 2 + 0.06, 1.5, 2.3, 'z', 1, 0x5a3a24);   // front door
         wb.box(o.x, y + hgt + 0.25, o.z, w + 2.0, 0.5, d + 2.8, ux, uz, 0x5a3d28);           // eaves
         wb.box(o.x + ux * w * 0.22 - uz * d * 0.12, y + hgt + 3.2, o.z + uz * w * 0.22 + ux * d * 0.12, 1.5, 5.5, 1.5, ux, uz, 0x9a938a);
       }
@@ -423,7 +449,7 @@
     agentMesh.count = 0;
     scene.add(agentMesh);
   }
-  Wd.agentScale = function () { return Math.min(9, Math.max(2.0, Wd.cam.dist / 520)); };
+  Wd.agentScale = function () { return Math.min(9, Math.max(1.0, Wd.cam.dist / 520)); };
   // agents: array of {x,y,z,fx,fz,vis,lean}
   Wd.drawAgents = function (agents) {
     var arr = agentMesh.instanceMatrix.array, c = 0, s = Wd.agentScale();
@@ -483,40 +509,6 @@
     ctx.fillStyle = win ? 'rgba(206,222,236,0.95)' : 'rgba(74,134,188,0.95)';
     OSM.lakes.forEach(function (l) { flat(l); ctx.closePath(); ctx.fill(); });
     ctx.strokeStyle = win ? 'rgba(120,160,196,0.85)' : 'rgba(74,134,188,0.95)';
-    OSM.rivers.forEach(function (r) { flat(r); ctx.lineWidth = Math.max(1.6, 11 * sm); ctx.stroke(); });
-    // roads
-    var WID = [15, 11, 8.5, 6.5];
-    OSM.roads.forEach(function (r) {
-      if (r[1]) return;
-      if (r[0] === 0 && G.year < 1978) return;
-      if (r[0] === 3 && !(r.com && r.rank <= (frac[r.com] || 0) + 0.04)) return;
-      flat(r[2]);
-      ctx.lineWidth = Math.max(1.3, WID[r[0]] * sm);
-      ctx.strokeStyle = win ? (r[0] < 2 ? 'rgba(150,156,166,0.9)' : 'rgba(196,202,210,0.85)') : (r[0] < 2 ? 'rgba(92,94,100,0.95)' : 'rgba(128,124,116,0.9)');
-      ctx.stroke();
-    });
-    // railway
-    OSM.rails.forEach(function (r) {
-      if (r[0]) return;
-      flat(r[1]); ctx.lineWidth = Math.max(1.6, 7 * sm); ctx.strokeStyle = 'rgba(58,48,44,0.95)'; ctx.setLineDash([]); ctx.stroke();
-      ctx.lineWidth = Math.max(0.8, 2.6 * sm); ctx.strokeStyle = 'rgba(210,205,196,0.9)'; ctx.setLineDash([5 * sm, 7 * sm]); ctx.stroke(); ctx.setLineDash([]);
-    });
-    // piste edges in their colour; the groomed core is punched out again
-    G.pistes.forEach(function (p) {
-      if (p.diff === 'route') return;
-      pts(p.pts); ctx.lineWidth = (p.width + 15) * sm; ctx.strokeStyle = SK.DIFF[p.diff].css; ctx.stroke();
-    });
-    ctx.globalCompositeOperation = 'destination-out';
-    G.pistes.forEach(function (p) {
-      if (p.diff === 'route') return;
-      pts(p.pts); ctx.lineWidth = p.width * sm; ctx.strokeStyle = '#000'; ctx.stroke();
-    });
-    ctx.globalCompositeOperation = 'source-over';
-    // ski routes: dashed orange diamonds, no grooming
-    G.pistes.forEach(function (p) {
-      if (p.diff !== 'route') return;
-      pts(p.pts); ctx.lineWidth = Math.max(2, 13 * sm); ctx.strokeStyle = 'rgba(240,138,28,0.95)'; ctx.setLineDash([16 * sm, 22 * sm]); ctx.stroke(); ctx.setLineDash([]);
-    });
     // closed for damage: red cross-hatching along the piste
     G.pistes.forEach(function (p) {
       if (!p.damaged) return;
@@ -532,6 +524,66 @@
       ctx.beginPath(); ctx.arc((e.x - T.x0) * sx, (e.z - T.z0) * sz, d.w * 0.95 * sm, 0, 6.3); ctx.fill();
     });
     Wd.dc.tex.needsUpdate = true;
+    Wd.rebuildLines();
+  };
+
+  // roads, rivers, railway and piste edges as real geometry laid on the terrain: sharp at any zoom
+  var lineMesh = null, matLine = null;
+  function dense(pts, step) {
+    var out = [pts[0]];
+    for (var i = 1; i < pts.length; i++) {
+      var a = pts[i - 1], b = pts[i], l = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(l / step));
+      for (var k = 1; k <= n; k++) out.push({ x: a.x + (b.x - a.x) * k / n, z: a.z + (b.z - a.z) * k / n });
+    }
+    return out;
+  }
+  function unflat(p) { var o = []; for (var i = 0; i < p.length; i += 2) o.push({ x: p[i], z: p[i + 1] }); return o; }
+  function strip(b, pts, width, hex, lift, side, dash) {
+    _col.set(hex);
+    var n = pts.length, prev = -1;
+    for (var i = 0; i < n; i++) {
+      var q = pts[Math.min(n - 1, i + 1)], r = pts[Math.max(0, i - 1)], dx = q.x - r.x, dz = q.z - r.z, l = Math.hypot(dx, dz) || 1;
+      var nx = -dz / l, nz = dx / l, cx = pts[i].x + nx * side, cz = pts[i].z + nz * side, hw = width / 2;
+      var x1 = cx + nx * hw, z1 = cz + nz * hw, x2 = cx - nx * hw, z2 = cz - nz * hw;
+      b.p.push(x1, T.heightAt(x1, z1) + lift, z1, x2, T.heightAt(x2, z2) + lift, z2);
+      b.n.push(0, 1, 0, 0, 1, 0); b.c.push(_col.r, _col.g, _col.b, _col.r, _col.g, _col.b);
+      var cur = b.v; b.v += 2;
+      if (prev >= 0 && !(dash && (Math.floor(i / dash) & 1))) b.i.push(prev, prev + 1, cur, prev + 1, cur + 1, cur);
+      prev = cur;
+    }
+  }
+  Wd.rebuildLines = function () {
+    var G = SK.G; if (!G) return;
+    if (lineMesh) { scene.remove(lineMesh); lineMesh.geometry.dispose(); lineMesh = null; }
+    if (!matLine) matLine = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+    var b = new Batch(), win = Wd.winterLook, frac = Wd.villageFrac || {}, st = CFG.LOW ? 22 : 11;
+    OSM.rivers.forEach(function (r) { var p = dense(unflat(r), st); strip(b, p, 13, win ? 0x8fb2cf : 0x3f7fb5, 0.35, 0); strip(b, p, 6, win ? 0xb9d2e6 : 0x5d9bcd, 0.45, 0); });
+    var WID = [13, 9.5, 7.5, 5.5];
+    OSM.roads.forEach(function (r) {
+      if (r[1]) return;
+      if (r[0] === 0 && G.year < 1978) return;
+      if (r[0] === 3 && !(r.com && r.rank <= (frac[r.com] || 0) + 0.04)) return;
+      var p = dense(unflat(r[2]), st), main = r[0] < 2;
+      strip(b, p, WID[r[0]] + 1.6, win ? 0xdfe5ec : 0x8a8f86, 0.5, 0);                                   // verge / ploughed snow bank
+      strip(b, p, WID[r[0]], win ? (main ? 0x8d949e : 0xc2c8d0) : (main ? 0x55585e : 0x77746d), 0.62, 0);
+      if (main && !CFG.LOW) strip(b, p, 0.45, win ? 0xd9dde2 : 0xe8e4d6, 0.7, 0, 2);                      // centre line
+    });
+    OSM.rails.forEach(function (r) {
+      if (r[0]) return;
+      var p = dense(unflat(r[1]), st);
+      strip(b, p, 5.2, 0x6a5f58, 0.6, 0); strip(b, p, 0.35, 0x2b2b2e, 0.78, 0.75); strip(b, p, 0.35, 0x2b2b2e, 0.78, -0.75);
+      if (!CFG.LOW) strip(b, dense(unflat(r[1]), 2.2), 2.6, 0x3d3430, 0.7, 0, 1);                         // sleepers
+    });
+    G.pistes.forEach(function (p) {
+      var col = SK.DIFF[p.diff].rgb, hex = (col[0] << 16) | (col[1] << 8) | col[2];
+      if (p.diff === 'route') { strip(b, p.pts, 4.5, hex, 1.0, 0, 2); return; }
+      strip(b, p.pts, 2.6, hex, 1.0, p.width / 2 + 1.6); strip(b, p.pts, 2.6, hex, 1.0, -(p.width / 2 + 1.6));
+      strip(b, p.pts, 0.9, 0xffffff, 1.05, p.width / 2 - 0.4); strip(b, p.pts, 0.9, 0xffffff, 1.05, -(p.width / 2 - 0.4));
+    });
+    if (!b.v) return;
+    lineMesh = new THREE.Mesh(b.build(), matLine);
+    lineMesh.frustumCulled = false; lineMesh.renderOrder = 1;
+    scene.add(lineMesh);
   };
 
   // ---------------------------------------------------------------- lifts
@@ -973,7 +1025,7 @@
       if (count === 2 && pinch) {
         var k = Object.keys(ptrs), a = ptrs[k[0]], b = ptrs[k[1]];
         var d = Math.hypot(a.x - b.x, a.y - b.y), ang = Math.atan2(b.y - a.y, b.x - a.x), my = (a.y + b.y) / 2, mx = (a.x + b.x) / 2;
-        if (pinch.d > 0 && d > 0) g.dist = Math.min(40000, Math.max(450, g.dist * pinch.d / d));
+        if (pinch.d > 0 && d > 0) g.dist = Math.min(40000, Math.max(110, g.dist * pinch.d / d));
         var da = ang - pinch.ang; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
         g.yaw -= da;
         // two fingers moving together: sideways pans, up/down tilts
@@ -1019,7 +1071,7 @@
     canvas.addEventListener('wheel', function (e) {
       e.preventDefault();
       var g = Wd.camGoal, f = Math.exp(e.deltaY * 0.0011), old = g.dist;
-      g.dist = Math.min(40000, Math.max(450, g.dist * f));
+      g.dist = Math.min(40000, Math.max(110, g.dist * f));
       var p = Wd.pick(e.clientX, e.clientY);
       if (p && g.dist < old) { var t = 1 - g.dist / old; g.tx += (p.x - g.tx) * t; g.tz += (p.z - g.tz) * t; }
     }, { passive: false });
@@ -1042,6 +1094,8 @@
     camera.position.set(c.tx + Math.sin(c.yaw) * cp * c.dist, ty + Math.sin(c.pitch) * c.dist, c.tz + Math.cos(c.yaw) * cp * c.dist);
     var gy = T.heightAt(camera.position.x, camera.position.z) + 60;
     if (T.inside(camera.position.x, camera.position.z) && camera.position.y < gy) camera.position.y = gy;
+    var nr = Math.max(2, Math.min(30, c.dist * 0.03));
+    if (Math.abs(camera.near - nr) > 0.5) { camera.near = nr; camera.updateProjectionMatrix(); }
     camera.lookAt(c.tx, ty, c.tz);
     sky.position.copy(camera.position);
   }
