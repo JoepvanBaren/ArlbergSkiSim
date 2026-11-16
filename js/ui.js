@@ -141,6 +141,7 @@
     else if (act === 'rope') { err = Sim.replaceRope(o); if (!err) UI.toast('New rope on ' + o.name + '.', 'good'); }
     else if (act === 'repair') { err = Sim.repair(B.sel.kind, o); if (!err) UI.toast(G.phase === 'winter' ? 'Emergency repair under way.' : 'Repaired.', 'good'); }
     else if (act === 'crew') { o.crew = +d.v; }
+    else if (act === 'queue-draw') { o.qPath = null; Wd.addLift(o); B.qLift = o; B.setTool('queue'); return; }
     else if (act === 'queue-rot') { o.qAng = ((o.qAng || 0) + Math.PI / 4) % (Math.PI * 2); Wd.addLift(o); }
     else if (act === 'toggle-closed') { Sim.setClosed(o, !o.closed); }
     else if (act === 'finish') { B.finishPiste(); return; }
@@ -260,6 +261,8 @@
         (pl.error ? '<div class="err">' + pl.error + '</div>' : (B.pending ? '' : '<div class="ok">Click to build.</div>')) + go : '<div class="hint">Place it on flat ground next to a piste. Guests are a little happier, and hungrier.</div>');
     } else if (B.tool === 'zone') {
       h = '<h4>No-go zone</h4><div class="hint">Mark an area nobody may enter: pistes and routes through it close, and freeriders stay off the slope. Red rings show avalanche slopes freeriders can reach from your lifts. ' + G.zones.length + ' / ' + T.MAXZONES + ' zones.</div><div class="acts"><span class="lbl">Size ' + B.zoneR + ' m</span><button class="btn" data-act="zone-r" data-n="-60">Smaller</button><button class="btn" data-act="zone-r" data-n="60">Bigger</button></div>' + go;
+    } else if (B.tool === 'queue') {
+      h = '<h4>Draw the queue line</h4><div class="hint">The line starts at the ticket gates. ' + (Wd.touch ? 'Tap' : 'Click') + ' point after point to lead it wherever you like, as long as you like; a net runs along its left and right side.</div><div class="acts"><button class="btn dark" data-act="cancel">Done</button></div>';
     } else if (B.tool === 'demolish') {
       h = '<h4>Remove</h4><div class="hint">' + (Wd.touch ? 'Tap' : 'Click') + ' a lift, piste, hut or no-go zone to remove it. Lifts return 15% scrap value.</div>';
     } else if (B.sel) h = selectionHtml();
@@ -283,7 +286,7 @@
         (winter ? '<span>Queue <b>' + Sim.queueTime(o).toFixed(0) + ' min</b></span><span>Carried <b>' + I(o.carried) + '</b></span>' : '') + '</div>';
       h += '<div class="acts"><span class="lbl">Crew</span>' + SK.CREW_LEVELS.map(function (c, i) {
         return '<button class="btn ' + (o.crew === i ? 'dark' : '') + '" data-act="crew" data-v="' + i + '" title="' + Math.round(ty.crew * c.f * 10) / 10 + ' staff">' + c.name.split(' ')[0] + '</button>';
-      }).join('') + '<button class="btn" data-act="toggle-closed">' + (o.closed ? 'Reopen' : 'Close') + '</button><button class="btn" data-act="queue-rot">Turn queue entrance</button>';
+      }).join('') + '<button class="btn" data-act="toggle-closed">' + (o.closed ? 'Reopen' : 'Close') + '</button><button class="btn" data-act="queue-rot">Turn queue entrance</button><button class="btn" data-act="queue-draw">Draw queue line</button>';
       if (o.damaged) h += '<button class="btn red" data-act="repair">' + (winter ? 'Emergency repair · ' + M(Sim.repairCost('lift', o) * 1.6) : 'Repair · ' + M(Sim.repairCost('lift', o))) + '</button>';
       h += '</div>';
       if (summer) {

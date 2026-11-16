@@ -205,7 +205,7 @@
 
   // ------------------------------------------------------------------ tool state
   B.setTool = function (tool) {
-    if (tool !== 'inspect' && tool !== 'zone' && SK.G.phase !== 'summer') { SK.UI.toast('Construction happens in summer. The crews are home for the winter.', 'warn'); tool = 'inspect'; }
+    if (tool !== 'inspect' && tool !== 'zone' && tool !== 'queue' && SK.G.phase !== 'summer') { SK.UI.toast('Construction happens in summer. The crews are home for the winter.', 'warn'); tool = 'inspect'; }
     B.tool = tool; B.start = null; B.pts = []; B.plan = null; B.pending = false;
     if (tool !== 'inspect') B.sel = null;
     T.uniforms.uShowHubs.value = (tool === 'lift' || tool === 'piste') ? 1 : 0;
@@ -318,6 +318,13 @@
     var G = SK.G;
     B.hover = p;
     if (Wd.touch && ((B.tool === 'lift' && B.start) || B.tool === 'hut' || B.tool === 'zone')) { B.updatePlan(); B.pending = !!B.plan; SK.UI.refreshPlan(); return; }
+    if (B.tool === 'queue' && B.qLift) {                              // each click extends the queue line away from the gates
+      var ql = B.qLift, qd = Wd.queueDir(ql);
+      if (!ql.qPath) ql.qPath = [{ x: ql.a.x + qd.x * 16, z: ql.a.z + qd.z * 16 }];
+      ql.qPath.push({ x: p.x, z: p.z });
+      Wd.addLift(ql);
+      return;
+    }
     if (B.tool === 'inspect') {
       B.sel = B.pickObject(p);
       B.redraw(); SK.UI.refreshSelection();

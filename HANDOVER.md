@@ -70,7 +70,8 @@ behind a help button); report as a small card instead of a full-screen stop; mor
 
 **Lifts (latest requests).** T-bars drawn correctly (bar pulling skiers on the ground); gondola
 cabins with doors that open and close in the station; queue entry and exit placed by hand like in RCT
-(so far only a "Turn queue entrance" button per lift: `lift.qAng`, `Wd.queueDir`); higher-quality nets.
+(so far: a "Turn queue entrance" button, `lift.qAng`, and a "Draw queue line" tool that stores `lift.qPath`,
+nets left and right, guests two abreast via `Wd.queuePos` — untested in a browser, no exit path yet); higher-quality nets.
 Place the lift line beside the piste rather than through its middle; choose where the
 queue forms; a clear "connected" marker; cabins and chairs visibly matching the flow of guests.
 

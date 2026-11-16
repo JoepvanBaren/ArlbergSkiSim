@@ -1109,6 +1109,11 @@
         a.x = _p.x; a.y = _p.y; a.z = _p.z; a.fx = a.lift.geom.ux; a.fz = a.lift.geom.uz;
       } else if (a.state === 'queue') {
         if (a.q > 59) { a.vis = false; continue; }
+        if (a.lift.qPath && a.lift.qPath.length > 1) {                                           // shuffling forward two abreast
+          Wd.queuePos(a.lift, 2 + ((a.q / 2) | 0) * Math.max(2.6, sc * 1.5), (a.q % 2 ? 1 : -1) * 1.1, _p);
+          a.x = _p.x; a.z = _p.z; a.y = T.heightAt(a.x, a.z) + 0.5; a.fx = _p.fx; a.fz = _p.fz;
+          continue;
+        }
         var qd = Wd.queueDir(a.lift), row = (a.q / 4) | 0, col = (a.q % 4 - 1.5) * 7;          // four lanes between the nets
         a.x = a.lift.a.x + qd.x * (21 + row * gap) - qd.z * col;
         a.z = a.lift.a.z + qd.z * (21 + row * gap) + qd.x * col;

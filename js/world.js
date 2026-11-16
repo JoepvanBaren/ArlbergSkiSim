@@ -693,13 +693,32 @@
     var a = lift.qAng || 0, bx = -lift.geom.ux, bz = -lift.geom.uz, c = Math.cos(a), s = Math.sin(a);
     return { x: bx * c - bz * s, z: bx * s + bz * c };
   };
+  // a place in a hand-drawn queue, `dist` metres back from the gates
+  Wd.queuePos = function (lift, dist, side, out) {
+    var P = lift.qPath, i = 1, L = 0;
+    for (; i < P.length; i++) { L = Math.hypot(P[i].x - P[i - 1].x, P[i].z - P[i - 1].z); if (dist <= L || i === P.length - 1) break; dist -= L; }
+    var t = Math.min(1, dist / (L || 1)), sx = (P[i].x - P[i - 1].x) / (L || 1), sz = (P[i].z - P[i - 1].z) / (L || 1);
+    out.x = P[i - 1].x + (P[i].x - P[i - 1].x) * t - sz * side; out.z = P[i - 1].z + (P[i].z - P[i - 1].z) * t + sx * side;
+    out.fx = -sx; out.fz = -sz;
+    return out;
+  };
   Wd.addLift = function (lift) {
     Wd.removeLift(lift.id);
     var ty = SK.LIFT[lift.type], g = lift.geom, a = lift.a, b = new Batch(), grp = new THREE.Group(), sh = [];
     var gauge = GAUGE[ty.style] * (ty.big ? 1.5 : 1), heavy = ty.style === 'tram' || ty.big;
     station(b, lift.a, g.ux, g.uz, ty, false);
     station(b, lift.b, g.ux, g.uz, ty, true);
-    var qd = Wd.queueDir(lift); corral(b, lift.a, -qd.x, -qd.z);
+    var qd = Wd.queueDir(lift);
+    if (lift.qPath && lift.qPath.length > 1) {                       // a hand-drawn queue: one lane between a left and a right net
+      for (var qi = 1; qi < lift.qPath.length; qi++) {
+        var A = lift.qPath[qi - 1], B2 = lift.qPath[qi], L = Math.hypot(B2.x - A.x, B2.z - A.z) || 1, sx = (B2.x - A.x) / L, sz = (B2.z - A.z) / L;
+        for (var sd = -1; sd <= 1; sd += 2) {
+          var mx = (A.x + B2.x) / 2 - sz * sd * 2.6, mz = (A.z + B2.z) / 2 + sx * sd * 2.6, my = T.heightAt(mx, mz);
+          b.box(mx, my + 0.8, mz, L + 0.3, 1.1, 0.1, sx, sz, 0xf07a1c); b.box(mx, my + 1.4, mz, L + 0.3, 0.12, 0.16, sx, sz, 0x30343a);
+          for (var pk = 0; pk <= L; pk += 4) { var px = A.x + sx * pk - sz * sd * 2.6, pz = A.z + sz * pk + sx * sd * 2.6; b.box(px, T.heightAt(px, pz) + 0.85, pz, 0.2, 1.8, 0.2, sx, sz, 0x30343a); }
+        }
+      }
+    } else corral(b, lift.a, -qd.x, -qd.z);
     [lift.a, lift.b].forEach(function (p, ti) {                       // what every station has: platform, control booth, sign, lights, gates
       var ux = g.ux, uz = g.uz, sg = ti ? -1 : 1, y = p.y, sx = -uz, sz = ux;
       b.box(p.x, y + 0.25, p.z, 26, 0.5, gauge + 12, ux, uz, 0xc9ced3);                                     // loading platform
