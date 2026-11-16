@@ -141,6 +141,7 @@
     else if (act === 'rope') { err = Sim.replaceRope(o); if (!err) UI.toast('New rope on ' + o.name + '.', 'good'); }
     else if (act === 'repair') { err = Sim.repair(B.sel.kind, o); if (!err) UI.toast(G.phase === 'winter' ? 'Emergency repair under way.' : 'Repaired.', 'good'); }
     else if (act === 'crew') { o.crew = +d.v; }
+    else if (act === 'queue-rot') { o.qAng = ((o.qAng || 0) + Math.PI / 4) % (Math.PI * 2); Wd.addLift(o); }
     else if (act === 'toggle-closed') { Sim.setClosed(o, !o.closed); }
     else if (act === 'finish') { B.finishPiste(); return; }
     else if (act === 'cancel') { B.cancel(); return; }
@@ -282,7 +283,7 @@
         (winter ? '<span>Queue <b>' + Sim.queueTime(o).toFixed(0) + ' min</b></span><span>Carried <b>' + I(o.carried) + '</b></span>' : '') + '</div>';
       h += '<div class="acts"><span class="lbl">Crew</span>' + SK.CREW_LEVELS.map(function (c, i) {
         return '<button class="btn ' + (o.crew === i ? 'dark' : '') + '" data-act="crew" data-v="' + i + '" title="' + Math.round(ty.crew * c.f * 10) / 10 + ' staff">' + c.name.split(' ')[0] + '</button>';
-      }).join('') + '<button class="btn" data-act="toggle-closed">' + (o.closed ? 'Reopen' : 'Close') + '</button>';
+      }).join('') + '<button class="btn" data-act="toggle-closed">' + (o.closed ? 'Reopen' : 'Close') + '</button><button class="btn" data-act="queue-rot">Turn queue entrance</button>';
       if (o.damaged) h += '<button class="btn red" data-act="repair">' + (winter ? 'Emergency repair · ' + M(Sim.repairCost('lift', o) * 1.6) : 'Repair · ' + M(Sim.repairCost('lift', o))) + '</button>';
       h += '</div>';
       if (summer) {

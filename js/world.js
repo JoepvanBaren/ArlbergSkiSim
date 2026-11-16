@@ -600,7 +600,8 @@
     for (var k = -2; k <= 2; k++) {
       var x = p.x - ux * 34 - uz * k * 7, z = p.z - uz * 34 + ux * k * 7;
       b.box(x, T.heightAt(x, z) + 1.2, z, 30, 0.5, 0.5, ux, uz, 0xd4392e);
-      b.box(x, T.heightAt(x, z) + 0.6, z, 30, 0.2, 0.3, ux, uz, 0xf4f4f4);
+      b.box(x, T.heightAt(x, z) + 0.75, z, 30, 1.1, 0.12, ux, uz, 0xf07a1c);                  // orange safety net
+      for (var q = -3; q <= 3; q++) { var px = x + ux * q * 5, pz = z + uz * q * 5; b.box(px, T.heightAt(px, pz) + 0.8, pz, 0.22, 1.7, 0.22, ux, uz, 0x30343a); }
     }
   }
   function station(b, p, ux, uz, ty, top) {
@@ -642,7 +643,6 @@
       b.box(p.x - ox * 8, y + 3.4, p.z - oz * 8, 34.4, 2.4, 19.4, ux, uz, 0x12303a);
       b.box(p.x - ox * 8, y + 0.8, p.z - oz * 8, 34.6, 1.0, 19.6, ux, uz, c);
     }
-    if (!top) corral(b, p, ux, uz);
   }
 
   function vehicleGeo(ty) {
@@ -688,12 +688,18 @@
     return b.build();
   }
 
+  // which way the queue stretches from the valley station (the player can turn it)
+  Wd.queueDir = function (lift) {
+    var a = lift.qAng || 0, bx = -lift.geom.ux, bz = -lift.geom.uz, c = Math.cos(a), s = Math.sin(a);
+    return { x: bx * c - bz * s, z: bx * s + bz * c };
+  };
   Wd.addLift = function (lift) {
     Wd.removeLift(lift.id);
     var ty = SK.LIFT[lift.type], g = lift.geom, a = lift.a, b = new Batch(), grp = new THREE.Group(), sh = [];
     var gauge = GAUGE[ty.style] * (ty.big ? 1.5 : 1), heavy = ty.style === 'tram' || ty.big;
     station(b, lift.a, g.ux, g.uz, ty, false);
     station(b, lift.b, g.ux, g.uz, ty, true);
+    var qd = Wd.queueDir(lift); corral(b, lift.a, -qd.x, -qd.z);
     [lift.a, lift.b].forEach(function (p, ti) {                       // what every station has: platform, control booth, sign, lights, gates
       var ux = g.ux, uz = g.uz, sg = ti ? -1 : 1, y = p.y, sx = -uz, sz = ux;
       b.box(p.x, y + 0.25, p.z, 26, 0.5, gauge + 12, ux, uz, 0xc9ced3);                                     // loading platform

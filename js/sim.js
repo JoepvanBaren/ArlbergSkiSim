@@ -1109,10 +1109,10 @@
         a.x = _p.x; a.y = _p.y; a.z = _p.z; a.fx = a.lift.geom.ux; a.fz = a.lift.geom.uz;
       } else if (a.state === 'queue') {
         if (a.q > 59) { a.vis = false; continue; }
-        var g = a.lift.geom, row = (a.q / 5) | 0, col = a.q % 5 - 2;
-        a.x = a.lift.a.x - g.ux * (22 + row * gap) - g.uz * col * 7;
-        a.z = a.lift.a.z - g.uz * (22 + row * gap) + g.ux * col * 7;
-        a.y = T.heightAt(a.x, a.z) + 0.5; a.fx = g.ux; a.fz = g.uz;
+        var qd = Wd.queueDir(a.lift), row = (a.q / 4) | 0, col = (a.q % 4 - 1.5) * 7;          // four lanes between the nets
+        a.x = a.lift.a.x + qd.x * (21 + row * gap) - qd.z * col;
+        a.z = a.lift.a.z + qd.z * (21 + row * gap) + qd.x * col;
+        a.y = T.heightAt(a.x, a.z) + 0.5; a.fx = -qd.x; a.fz = -qd.z;
       } else a.vis = false;
     }
     Wd.drawAgents(agents);
