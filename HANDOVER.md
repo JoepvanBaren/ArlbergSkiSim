@@ -57,6 +57,16 @@ awareness, campaigns, ticket price; free-play buttons (jump years, add money).
 - Light graphics (`CFG.LOW`) switch on automatically for phones and small screens: no tree snow caps,
   no house windows / chimneys, fewer trees, half-resolution terrain. Test detail work with `?high=1`.
 
+## Added in the overhaul of 2026-11-17
+
+- Winter decisions: `makeEvent` in `js/sim.js` raises a "Your call" card (`UI.showEvent`) a few times per
+  winter; the season waits (`Sim.hold`) until an option is picked; skipping auto-picks the first option.
+- Rescue helicopter (`Wd.flyHeli`), flown by the helicopter options.
+- Hut types in `SK.HUTS` (bar, restaurant, hotel with beds); guests stop at the hut nearest their piste
+  (`piste.hut`, agent state `hut`) and pay per visit.
+- Night skiing (`piste.lights`) and fun parks (`piste.park`) as piste upgrades with props and effects.
+- T-bars at human size; tips and pre-opening warnings off unless "Show tips" is pressed.
+
 ## Backlog (owner's requests, not done yet)
 
 **Graphics — the main one.** A first pass is in (terrain ambient occlusion, valley haze, sun glow,
@@ -74,9 +84,6 @@ cabins with doors that open and close in the station; queue entry and exit place
 nets left and right, guests two abreast via `Wd.queuePos` — untested in a browser, no exit path yet); higher-quality nets.
 Place the lift line beside the piste rather than through its middle; choose where the
 queue forms; a clear "connected" marker; cabins and chairs visibly matching the flow of guests.
-
-**Huts.** Auto-connect to the nearest piste; types (bar, lunch, mountain hotel) with different
-effects; guests visibly stop there.
 
 **Snowmaking as a system.** Individual snow cannons along a piste; electricity (transformers,
 visible cables to lifts and cannons, simple auto-connect within reach); water reservoirs.

@@ -133,8 +133,9 @@
   Sim.capacity = function () {
     var acc = Sim.access(), cap = 0;
     SK.COMMUNITIES.forEach(function (c) { cap += acc[c.id] * (Sim.bedsOf(c.id) * 0.9 + Sim.dayGuests(c.id)); });
-    return cap;
+    return cap > 0 ? cap + Sim.hotelBeds() : 0;
   };
+  Sim.hotelBeds = function () { var b = 0; G.huts.forEach(function (h) { b += (SK.HUTS[h.type || 'lunch'].beds || 0); }); return b; };
   Sim.buyProject = function (p) {
     if (G.projects[p.id]) return 'Already built.';
     if (!Sim.unlocked(p)) return 'Not before ' + p.year + '.';
@@ -243,7 +244,7 @@
           if (best < 0) continue;
           if (p.cum[best] < CFG.SNAP * 1.3 || p.len - p.cum[best] < CFG.SNAP * 1.3) continue;
           var mk = function (pts, share) {
-            return Sim.derivePiste({ id: G.nextId++, name: p.name, pts: pts, width: p.width, diff: p.diff, snowmaking: p.snowmaking, barrier: p.barrier,
+            return Sim.derivePiste({ id: G.nextId++, name: p.name, pts: pts, width: p.width, diff: p.diff, snowmaking: p.snowmaking, barrier: p.barrier, lights: p.lights, park: p.park,
               cost: p.cost * share, built: p.built, open: true });
           };
           G.pistes.splice(k, 1, mk(p.pts.slice(0, best + 1), best / p.pts.length), mk(p.pts.slice(best), 1 - best / p.pts.length));
@@ -285,6 +286,11 @@
     G.pistes.forEach(function (p) {
       p.zoned = false;
       (G.zones || []).forEach(function (zn) { for (var q = 0; q < p.pts.length; q += 2) if (Math.hypot(p.pts[q].x - zn.x, p.pts[q].z - zn.z) < zn.r) { p.zoned = true; break; } });
+    });
+    // every piste knows the nearest hut along its way
+    G.pistes.forEach(function (p) {
+      p.hut = null; var bd = 230;
+      G.huts.forEach(function (h) { for (var q = 0; q < p.pts.length; q += 3) { var d = Math.hypot(p.pts[q].x - h.x, p.pts[q].z - h.z); if (d < bd) { bd = d; p.hut = h; } } });
     });
     Sim.findHazards();
     Sim.route();
@@ -455,8 +461,9 @@
     refreshWorld();
     return p;
   };
-  Sim.addHut = function (pt, cost, weeks) {
-    G.huts.push({ id: G.nextId++, x: pt.x, y: pt.y, z: pt.z, built: G.year });
+  Sim.addHut = function (pt, cost, weeks, type) {
+    G.huts.push({ id: G.nextId++, x: pt.x, y: pt.y, z: pt.z, built: G.year, type: type || 'lunch' });
+    Sim.rebuildGraph();
     Sim.spend(cost, 'construction'); G.crewLeft -= weeks;
     Wd.rebuildProps(); Wd.rebuildTrees();
   };
@@ -512,6 +519,64 @@
     Wd.rebuildProps();
     return null;
   };
+  Sim.lightsCost = function (p) { return Math.round(p.len * 130 * (0.4 + 0.6 * Sim.era()) / 1000) * 1000; };
+  Sim.toggleLights = function (p) {
+    if (p.diff === 'route') return 'Nobody skis a route in the dark.';
+    if (p.lights) { p.lights = false; Wd.rebuildProps(); return null; }
+    var c = Sim.lightsCost(p), err = Sim.checkBudget(c, 2);
+    if (err) return err;
+    p.lights = true; Sim.spend(c, 'construction'); G.crewLeft -= 2; Wd.rebuildProps();
+    return null;
+  };
+  Sim.parkCost = function () { return Math.round(160000 * (0.4 + 0.6 * Sim.era()) / 1000) * 1000; };
+  Sim.togglePark = function (p) {
+    if (p.park) { p.park = false; Wd.rebuildProps(); return null; }
+    if (p.diff !== 'blue' && p.diff !== 'red') return 'A fun park needs a blue or red piste.';
+    if (p.len < 350) return 'Too short for a fun park.';
+    var c = Sim.parkCost(), err = Sim.checkBudget(c, 2);
+    if (err) return err;
+    p.park = true; Sim.spend(c, 'construction'); G.crewLeft -= 2; Wd.rebuildProps();
+    return null;
+  };
+
+  // ---- winter decisions ----
+  function bump(d) { G.reputation = Math.max(0, Math.min(100, G.reputation + d)); }
+  function makeEvent(S, r) {
+    var era = Sim.era(), k = Math.max(1, Math.sqrt(S.visitorsToday / 300)), L = G.lifts.filter(function (l) { return l.open; }), P = G.pistes.filter(function (p) { return p.open; });
+    if (!L.length || !P.length) return null;
+    var lift = L[(r() * L.length) | 0], piste = P[(r() * P.length) | 0], busy = L.slice().sort(function (a, b) { return b.queue.length - a.queue.length; })[0];
+    var heliCost = Math.round(9000 * era * 2), pt = piste.pts[(piste.pts.length / 2) | 0], list = [];
+    list.push({ title: 'Missing at dusk', text: 'Two guests who rode ' + lift.name + ' have not come back. It is getting dark.', x: lift.b.x, z: lift.b.z, opts: [
+      { label: 'Send the helicopter · ' + SK.fmtMoney(heliCost), fn: function () { Sim.spend(heliCost, 'damages'); bump(1.5); Wd.flyHeli(lift.b.x + 300, lift.b.z - 200); return 'The helicopter found them cold but unharmed. The papers praise the rescue.'; } },
+      { label: 'Search on foot with the patrol', fn: function () { if ((G.staff.patrol || 0) >= 2 && rnd() < 0.7) { bump(0.5); return 'The patrol brought them down by torchlight.'; } bump(-3); G.awareness = Math.min(1, G.awareness + 0.01); return 'They spent the night out. "Lost on the Arlberg" is in every newspaper.'; } }] });
+    list.push({ title: 'Accident on ' + piste.name, text: 'A skier lies on the piste with a broken leg.', x: pt.x, z: pt.z, opts: [
+      { label: 'Helicopter · ' + SK.fmtMoney(heliCost), fn: function () { Sim.spend(heliCost, 'damages'); bump(1); Wd.flyHeli(pt.x, pt.z); return 'In hospital within twenty minutes.'; } },
+      { label: 'Rescue sled', fn: function () { if ((S.patrolQ === undefined ? 1 : S.patrolQ) >= 1) { bump(0.3); return 'The patrol had the sled there in minutes.'; } bump(-1.8); return 'With too few patrollers the wait was long, and people watched.'; } }] });
+    list.push({ title: 'A travel writer in the valley', text: 'She writes for a big city newspaper and would like to see everything.', opts: [
+      { label: 'Host her for a week · ' + SK.fmtMoney(Math.round(6000 * era * k)), fn: function () { Sim.spend(Math.round(6000 * era * k), 'marketing'); if (G.reputation < 45) { bump(-1); return 'Her article is honest. Too honest.'; } G.awareness = Math.min(1, G.awareness + 0.05); return 'A glowing double page. Awareness is up.'; } },
+      { label: 'No special treatment', fn: function () { return 'She pays for her ticket like everyone else.'; } }] });
+    list.push({ title: 'Queues at ' + busy.name, text: 'Guests have been standing in the cold for a long time and tempers are fraying.', x: busy.a.x, z: busy.a.z, opts: [
+      { label: 'Hand out hot tea · ' + SK.fmtMoney(Math.round(1500 * era * k)), fn: function () { Sim.spend(Math.round(1500 * era * k), 'ops'); bump(1); return 'Tea, a smile, and the mood turns.'; } },
+      { label: 'Run the lift faster than the manual says', fn: function () { busy.cond = Math.max(0, busy.cond - 9); busy.loadAcc += 25; bump(0.5); return 'The queue melts. The gearbox does not thank you.'; } }] });
+    list.push({ title: 'The lift crews want a bonus', text: 'A hard winter, long days. They ask for a little extra.', opts: [
+      { label: 'Pay it · ' + SK.fmtMoney(Math.round(Sim.wagesPerSeason() * 0.04)), fn: function () { Sim.spend(Sim.wagesPerSeason() * 0.04, 'wages'); bump(0.4); return 'Friendly faces at every station.'; } },
+      { label: 'Refuse', fn: function () { bump(-1); L.slice(0, 3).forEach(function (l) { l.cond = Math.max(0, l.cond - 5); }); return 'Work to rule. Lifts start late and nobody smiles.'; } }] });
+    list.push({ title: 'A film star asks for the mountain', text: 'A private morning on ' + piste.name + ', no other guests. The fee is generous.', opts: [
+      { label: 'Close it for her · +' + SK.fmtMoney(Math.round(25000 * era * k)), fn: function () { Sim.earn(Math.round(25000 * era * k), 'grants'); bump(-1); G.awareness = Math.min(1, G.awareness + 0.02); return 'The photos go round the world; your guests grumble at the rope.'; } },
+      { label: 'The mountain is for everyone', fn: function () { bump(0.6); return 'Word gets round. Guests like that.'; } }] });
+    if (S.fresh3[2] > 14) list.push({ title: 'Powder morning', text: Math.round(S.fresh3[2]) + ' cm of fresh snow overnight and a queue before sunrise.', opts: [
+      { label: 'Open an hour early', fn: function () { bump(1.3); if (S.danger >= 3 && !G.tech.ava1 && rnd() < 0.25) { bump(-3); return 'First tracks - and a slab let go under a guest. Luckily only a fright.'; } return 'First tracks for everyone. They will talk about this day for years.'; } },
+      { label: 'Check every slope first', fn: function () { bump(0.2); return 'Safe and sound, if a little late.'; } }] });
+    return list[(r() * list.length) | 0];
+  }
+  Sim.resolveEvent = function (i) {
+    var S = G.season; if (!S || !S.pending) { Sim.hold = false; return ''; }
+    var t = S.pending.opts[i].fn();
+    S.log.push({ d: S.day, t: S.pending.title + ': ' + t, k: '', x: S.pending.x, z: S.pending.z });
+    S.pending = null; Sim.hold = false;
+    return t;
+  };
+
   // ---- maintenance ----
   Sim.condCap = function (l) { return Math.max(40, 100 - Math.max(0, G.year - (l.rope || l.built) - 20) * 4); };
   Sim.overhaulCost = function (l) { return Math.round(l.cost * (0.012 + 0.035 * (1 - l.cond / 100)) / 100) * 100; };
@@ -810,6 +875,7 @@
       comCap[c.id] = k; cap += k;
     });
     if (flexenShut && (acc.lech || acc.zuers || acc.warth)) { S.flexenDays++; if (S.flexenDays === 1) note(S, 'Avalanche danger shuts the Flexen road. Half the guests of Zürs, Lech and Warth cannot get in.', 'warn'); }
+    if (cap > 0) cap += Sim.hotelBeds();
     var v = m.openKm > 0 && cap > 0 ? Math.min(mk.size * mk.share * dayF * wF, cap) : 0;
     S.visitorsToday = Math.round(v);
     S.sumVisitors += S.visitorsToday; S.sumOpen += m.openFrac; S.peak = Math.max(S.peak, S.visitorsToday);
@@ -821,7 +887,11 @@
     // money
     var tickets = S.visitorsToday * G.price * (G.tech.dynprice ? 1.09 : 1);
     Sim.earn(tickets, 'tickets');
-    if (G.huts.length) Sim.earn(Math.min(S.visitorsToday, G.huts.length * 700) * 3.4, 'huts');
+    // night skiing sells evening tickets; fun parks need shapers
+    var litKm = 0, parks = 0;
+    G.pistes.forEach(function (p) { if (p.lights && p.open) litKm += p.len / 1000; if (p.park) parks++; });
+    if (litKm > 0) { Sim.earn(S.visitorsToday * G.price * 0.09 * Math.min(1, litKm / 3), 'tickets'); Sim.spend(litKm * 90 * era, 'ops'); }
+    if (parks) Sim.spend(parks * 350 * era, 'ops');
     var ops = 60 + tickets * 0.16;
     G.lifts.forEach(function (l) { if (l.open) ops += SK.LIFT[l.type].op; });
     Sim.spend(ops, 'ops');
@@ -839,6 +909,15 @@
     if (S.dayRatings > 0) G.reputation += (S.dayRatingSum / S.dayRatings - G.reputation) * 0.014;
     S.dayRatingSum = 0; S.dayRatings = 0;
     if (S.visitorsToday > 0) G.awareness = Math.min(1, G.awareness + 0.00012 * (G.reputation / 60));
+    // now and then the winter asks you something
+    if (S.visitorsToday > 0 && !Sim.hold && S.day > 3 && (S.evCount || 0) < 6 && r() < 0.05) {
+      var ev = makeEvent(S, r);
+      if (ev) {
+        S.evCount = (S.evCount || 0) + 1;
+        if (Sim.speed >= 40) note(S, ev.opts[0].fn(), '');
+        else { Sim.hold = true; S.pending = ev; SK.UI.showEvent(ev); }
+      }
+    }
     S.days.push({ v: S.visitorsToday, w: P.w, s: S.snowline, d: S.danger });
     var smLine = 9999;
     G.pistes.forEach(function (p) { if (p.snowmaking && (p.base || 0) > 15) smLine = Math.min(smLine, p.low); });
@@ -874,7 +953,7 @@
     }
     rec.goal = gres ? { id: gres.goal.id, ok: gres.ok } : null;
     if (G.money < -(Sim.maxLoan() - G.loan) - 50000) G.over = true;
-    agents.length = 0;
+    agents.length = 0; Sim.hold = false;
     G.lifts.forEach(function (l) { l.queue = []; l.running = false; l.open = true; l.broken = 0; l.repairDays = 0; l.windHold = false; });
     G.pistes.forEach(function (p) { p.open = true; p.blocked = 0; p.avClosed = false; p.repairDays = 0; });
     G.debris = [];
@@ -981,6 +1060,8 @@
     if (G.tech.snowcat && S.groomQ > 0.7) r += 3;
     if (G.tech.winch && S.groomQ > 0.7) r += 2;
     if (a.routes) r += 4;
+    if (a.ate) r += a.hut && a.hut.type === 'bar' ? 2 : 3.5;
+    if (a.park) r += 3;
     r += Math.min(4, G.huts.length) * 1.2;
     if (G.projects.pedestrian) r += 1.2;
     if (G.projects.tunnels) r += 1.0;
@@ -1009,6 +1090,7 @@
       if (nodes[p.nb].home === Infinity) continue;
       w = PREF[a.skill][p.diff] * (a.last.indexOf(p.id) >= 0 ? 0.55 : 1);
       if (p.diff === 'route' && S.powder) w *= 1.8;
+      if (p.park && a.skill > 0) w *= 1.6;
       if (w <= 0) continue;
       opts.push(['p', p, w]); tw += w;
     }
@@ -1034,6 +1116,7 @@
     a.state = 'ski'; a.piste = p; a.s = 0; a.viaLift = false;
     if (PREF[a.skill][p.diff] < 0.2) a.hard++;
     if (p.diff === 'route') a.routes++;
+    if (p.park && a.skill > 0) a.park = 1;
     if (a.last.indexOf(p.id) < 0) { a.distinct++; a.last.push(p.id); if (a.last.length > 4) a.last.shift(); }
   }
   Sim.throughput = function (l, S) {
@@ -1078,7 +1161,17 @@
         if (a.s <= 0) decide(a, nodes[a.lift.na], S);
       } else if (a.state === 'ski') {
         a.s += SPEED[a.skill][a.piste.diff] * a.v * dt;
-        if (a.s >= a.piste.len) { a.runs++; decide(a, nodes[a.piste.nb], S); }
+        if (a.s >= a.piste.len) {
+          a.runs++;
+          var hh = a.piste.hut, ht = hh && SK.HUTS[hh.type || 'lunch'];
+          if (hh && !a.ate && !a.home && rnd() < ht.stop) {             // time for a break
+            a.ate = true; a.state = 'hut'; a.hut = hh; a.t = 5 + rnd() * 6; a.node = a.piste.nb; a.ho = rnd() * 6.28;
+            Sim.earn(ht.spend * S.scale, 'huts'); hh.visits = (hh.visits || 0) + S.scale;
+          } else decide(a, nodes[a.piste.nb], S);
+        }
+      } else if (a.state === 'hut') {
+        a.t -= dt;
+        if (a.t <= 0) decide(a, nodes[a.node], S);
       }
     }
     for (i = agents.length - 1; i >= 0; i--) if (agents[i].state === 'gone') { agents[i] = agents[agents.length - 1]; agents.pop(); }
@@ -1118,6 +1211,10 @@
         a.x = a.lift.a.x + qd.x * (21 + row * gap) - qd.z * col;
         a.z = a.lift.a.z + qd.z * (21 + row * gap) + qd.x * col;
         a.y = T.heightAt(a.x, a.z) + 0.5; a.fx = -qd.x; a.fz = -qd.z;
+      } else if (a.state === 'hut') {
+        var rr = 16 + (a.slot % 4) * 3.5;
+        a.x = a.hut.x + Math.cos(a.ho) * rr; a.z = a.hut.z + Math.sin(a.ho) * rr; a.y = T.heightAt(a.x, a.z) + 0.5;
+        a.fx = -Math.cos(a.ho); a.fz = -Math.sin(a.ho);
       } else a.vis = false;
     }
     Wd.drawAgents(agents);
@@ -1126,7 +1223,7 @@
   Sim.speed = 1; Sim.paused = false;
   Sim.update = function (realDt) {
     SK.simDt = 0;
-    if (!G || G.phase !== 'winter' || Sim.paused) return;
+    if (!G || G.phase !== 'winter' || Sim.paused || Sim.hold) return;
     var S = G.season, dt = realDt * Sim.speed;
     SK.simDt = dt;
     Sim._boost = 1 + (G.tech.keycard ? 0.08 : 0) + (G.tech.rfid ? 0.10 : 0);

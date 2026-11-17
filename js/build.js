@@ -249,7 +249,7 @@
     } else if (B.tool === 'hut' && h) {
       var sl = T.slopeAt(h.x, h.z), near = false;
       SK.G.pistes.forEach(function (ps) { for (var i = 0; i < ps.pts.length; i += 3) if (Math.hypot(ps.pts[i].x - h.x, ps.pts[i].z - h.z) < 160) near = true; });
-      var cost = 60000 + Math.round(Math.max(0, h.y - 1400) * 60), e2 = null;
+      var cost = Math.round(SK.HUTS[B.hutType || 'lunch'].cost * (0.5 + 0.5 * Sim.era()) / 1000) * 1000 + Math.round(Math.max(0, h.y - 1400) * 60), e2 = null;
       if (sl > 0.35) e2 = 'Too steep for a hut.'; else if (!near) e2 = 'Huts need a piste within 160 m.';
       B.plan = { kind: 'hut', cost: cost, weeks: 3, error: e2 || Sim.checkBudget(cost, 3), hard: !!e2, pt: h };
     } else if (B.tool === 'zone' && h) {
@@ -368,8 +368,8 @@
       B.updatePlan();
       if (!B.plan) return;
       if (B.plan.error) { SK.UI.toast(B.plan.error, 'warn'); return; }
-      Sim.addHut({ x: p.x, y: p.y, z: p.z }, B.plan.cost, B.plan.weeks);
-      SK.UI.toast('Mountain hut opened. Kaiserschmarrn for everyone.', 'good');
+      Sim.addHut({ x: p.x, y: p.y, z: p.z }, B.plan.cost, B.plan.weeks, B.hutType || 'lunch');
+      SK.UI.toast(SK.HUTS[B.hutType || 'lunch'].name + ' opened.', 'good');
       B.updatePlan(); SK.UI.refreshAll();
     } else if (B.tool === 'zone') {
       var ze = Sim.addZone({ x: p.x, z: p.z }, B.zoneR);

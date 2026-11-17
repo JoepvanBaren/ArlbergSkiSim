@@ -648,8 +648,9 @@
   function vehicleGeo(ty) {
     var b = new Batch(), c = ty.color, s = VS;
     if (ty.style === 'surface') {
-      b.box(0, -3.2 * s, 0, 0.3 * s, 6.4 * s, 0.3 * s, 1, 0, 0x30343a);
-      b.box(0, -6.2 * s, 0, 2.6 * s, 0.35 * s, 0.35 * s, 1, 0, 0xc9a23a);
+      b.box(0, -0.35, 0, 0.5, 0.7, 0.9, 1, 0, 0xc9a23a);                // spring box on the rope
+      b.box(0, -3.0, -0.5, 0.12, 4.8, 0.12, 1, 0, 0x30343a);
+      b.box(0, -5.5, -0.9, 2.3, 0.16, 0.16, 1, 0, 0xc9a23a);            // the T
     } else if (ty.style === 'chair') {
       var w = (1.2 + ty.seats * 0.85) * s;
       b.box(0, -1.2 * s, 0, 0.3 * s, 2.4 * s, 0.3 * s, 1, 0, 0x4a4f57);               // hanger
@@ -846,11 +847,28 @@
     var G = SK.G; if (!G) return;
     var b = new Batch();
     G.huts.forEach(function (h) {
-      b.box(h.x, h.y + 1.8, h.z, 22, 3.6, 15, 0.94, 0.34, 0xe9e2d2);
-      b.box(h.x, h.y + 6, h.z, 22.5, 5, 15.5, 0.94, 0.34, 0x8a5a3a);
-      b.roof(h.x, h.y + 8.5, h.z, 26, 7, 19, 0.94, 0.34, 0xf4f6f8);
-      b.box(h.x + 14, h.y + 0.6, h.z + 10, 12, 1.2, 9, 0.94, 0.34, 0xc19a6b);
-      b.box(h.x + 12, h.y + 3.2, h.z + 9, 0.3, 4, 0.3, 1, 0, 0x555555); b.cyl(h.x + 12, h.y + 4.6, h.z + 9, 3, 0.5, 0xd4392e, 0.2, 8);
+      var ty = h.type || 'lunch', ux = 0.94, uz = 0.34, k = ty === 'hotel' ? 1.7 : ty === 'bar' ? 0.6 : 1, fl = ty === 'hotel' ? 3 : 1;
+      var w = 22 * k, d = 15 * k, top = 3.6 + fl * 4.2;
+      b.box(h.x, h.y + 1.8, h.z, w, 3.6, d, ux, uz, 0xe9e2d2);
+      b.box(h.x, h.y + 3.6 + fl * 2.1, h.z, w + 0.5, fl * 4.2, d + 0.5, ux, uz, ty === 'hotel' ? 0xf1eadb : 0x8a5a3a);
+      b.box(h.x, h.y + top + 0.2, h.z, w + 3, 0.5, d + 3.6, ux, uz, 0x5a3d28);
+      b.roof(h.x, h.y + top + 0.4, h.z, w + 2.4, 4 + k * 2, d + 3.4, ux, uz, 0xf4f6f8);
+      for (var f = 0; f <= fl; f++) for (var q = 0; q < Math.floor(w / 3.2); q++) {
+        var lx = (q + 0.5) / Math.floor(w / 3.2) * w - w / 2, wy = h.y + 2.2 + f * 4.2, off = d / 2 + (f ? 0.3 : 0.05);
+        b.pane(h.x, wy, h.z, ux, uz, lx, off, 1.4, 1.6, 'z', 1, (q + f) % 3 ? 0x2f4257 : 0xf6cd72); b.pane(h.x, wy, h.z, ux, uz, lx, off, 1.4, 1.6, 'z', -1, 0x2f4257);
+      }
+      // sun terrace with tables and umbrellas
+      var tx = h.x - uz * (d / 2 + 6), tz = h.z + ux * (d / 2 + 6), tyy = T.heightAt(tx, tz);
+      b.box(tx, tyy + 0.4, tz, w * 1.1, 0.8, 11, ux, uz, 0xc19a6b);
+      b.box(tx - uz * 5.4, tyy + 1.3, tz + ux * 5.4, w * 1.1, 1.0, 0.15, ux, uz, 0x7d5536);
+      for (q = -2; q <= 2; q++) {
+        var ox = tx + ux * q * w * 0.2, oz = tz + uz * q * w * 0.2;
+        b.box(ox, tyy + 1.2, oz, 1.6, 0.15, 1.6, ux, uz, 0xe9e2d2); b.cyl(ox, tyy + 0.8, oz, 0.12, 2.6, 0x555555, 1, 5);
+        b.cyl(ox, tyy + 3.2, oz, 2.1, 0.9, ty === 'bar' ? [0xe2483a, 0xf2c230, 0x2b7fd6][(q + 2) % 3] : 0xf4efe4, 0.08, 8);
+      }
+      b.cyl(h.x + ux * (w / 2 + 2), h.y, h.z + uz * (w / 2 + 2), 0.2, 9, 0x6f787f, 0.8, 5);                // flagpole
+      b.box(h.x + ux * (w / 2 + 3.4), h.y + 8, h.z + uz * (w / 2 + 3.4), 2.6, 1.6, 0.1, ux, uz, ty === 'bar' ? 0xf2c230 : 0xd4392e);
+      b.box(h.x + ux * w * 0.25, h.y + top + 4, h.z + uz * w * 0.25, 1.6, 4, 1.6, ux, uz, 0x9a938a);        // chimney
     });
     G.pistes.forEach(function (p) {
       var n = p.pts.length, col = SK.DIFF[p.diff].rgb, hex = (col[0] << 16) | (col[1] << 8) | col[2], step = CFG.LOW ? 16 : 9;
@@ -867,6 +885,19 @@
           var gx = p.pts[i].x + nx * (p.width / 2 + 9), gz = p.pts[i].z + nz * (p.width / 2 + 9), gy = T.heightAt(gx, gz);
           b.cyl(gx, gy, gz, 0.4, 10, 0xf2c230, 0.6, 5); b.box(gx - nx * 1.6, gy + 10.2, gz - nz * 1.6, 3.4, 0.8, 0.8, nx, nz, 0xf2c230);
         }
+      }
+      if (p.lights) for (i = 3; i < n - 2; i += 7) {                          // floodlights for night skiing
+        var A2 = p.pts[i - 1], B3 = p.pts[i + 1], dl2 = Math.hypot(B3.x - A2.x, B3.z - A2.z) || 1, lnx = -(B3.z - A2.z) / dl2, lnz = (B3.x - A2.x) / dl2;
+        var sd = ((i / 7) | 0) % 2 ? 1 : -1, fx2 = p.pts[i].x + lnx * sd * (p.width / 2 + 4), fz2 = p.pts[i].z + lnz * sd * (p.width / 2 + 4), fy2 = T.heightAt(fx2, fz2);
+        b.cyl(fx2, fy2, fz2, 0.3, 13, 0x6f787f, 0.7, 5); b.box(fx2 - lnx * sd * 1.6, fy2 + 13, fz2 - lnz * sd * 1.6, 3.4, 0.5, 1.4, lnx, lnz, 0xfff0b0);
+        b.box(fx2 - lnx * sd * 1.6, fy2 + 12.6, fz2 - lnz * sd * 1.6, 3.0, 0.3, 1.0, lnx, lnz, 0xffd24a);
+      }
+      if (p.park) for (i = 8; i < n - 6; i += 9) {                           // kickers, boxes and rails
+        var C2 = p.pts[i], D2 = p.pts[i + 1], dl3 = Math.hypot(D2.x - C2.x, D2.z - C2.z) || 1, px2 = (D2.x - C2.x) / dl3, pz2 = (D2.z - C2.z) / dl3, kind = ((i / 9) | 0) % 3;
+        var side2 = (((i / 9) | 0) % 2 ? 1 : -1) * p.width * 0.18, kx = C2.x - pz2 * side2, kz = C2.z + px2 * side2, ky = T.heightAt(kx, kz);
+        if (kind === 0) { b.box(kx, ky + 1.2, kz, 9, 2.4, 6, px2, pz2, 0xf7f9fb, 0.35); b.box(kx + px2 * 9, ky + 0.6, kz + pz2 * 9, 8, 1.2, 6, px2, pz2, 0xeef2f6, 0.6); }
+        else if (kind === 1) { b.box(kx, ky + 0.9, kz, 8, 0.5, 0.9, px2, pz2, 0xe2483a); b.box(kx - px2 * 3, ky + 0.45, kz - pz2 * 3, 0.3, 0.9, 0.3, px2, pz2, 0x30343a); b.box(kx + px2 * 3, ky + 0.45, kz + pz2 * 3, 0.3, 0.9, 0.3, px2, pz2, 0x30343a); }
+        else { b.box(kx, ky + 0.6, kz, 7, 1.2, 2.2, px2, pz2, 0x2b7fd6); b.box(kx, ky + 1.25, kz, 7, 0.12, 2.3, px2, pz2, 0xf2c230); }
       }
       if (p.barrier && p.avPath) {                                          // steel snow bridges in the release zone
         for (var r = 0; r < 4; r++) {
@@ -1163,7 +1194,35 @@
   }
   Wd.flyTo = function (x, z, dist) { Wd.camGoal.tx = x; Wd.camGoal.tz = z; if (dist) Wd.camGoal.dist = dist; };
 
+  var heli = null;
+  Wd.flyHeli = function (x, z) {
+    if (!heli) {
+      var b = new Batch();
+      b.hull(0, -1.6, 0, 9, 4.2, 3.4, 1, 0, 0xd4392e, 7); b.box(0, -0.9, 0, 9, 1.4, 4.0, 1, 0, 0xd4392e);
+      b.box(2.6, 0.2, 0, 3.2, 1.5, 3.3, 1, 0, 0x1d2731); b.box(-7.5, 0.3, 0, 8, 0.7, 0.7, 1, 0, 0xd4392e); b.box(-11, 1.4, 0, 1.0, 2.6, 0.3, 1, 0, 0xf4f6f8);
+      b.box(0, -2.6, 1.6, 7, 0.2, 0.3, 1, 0, 0x30343a); b.box(0, -2.6, -1.6, 7, 0.2, 0.3, 1, 0, 0x30343a); b.box(0, 2.3, 0, 0.4, 0.9, 0.4, 1, 0, 0x30343a);
+      var body = new THREE.Mesh(b.build(), matSolid), rb = new Batch();
+      rb.box(0, 0, 0, 17, 0.12, 0.7, 1, 0, 0x30343a); rb.box(0, 0, 0, 0.7, 0.12, 17, 1, 0, 0x30343a);
+      var rotor = new THREE.Mesh(rb.build(), matSolid); rotor.position.y = 2.8;
+      heli = new THREE.Group(); heli.add(body); heli.add(rotor); heli.rotor = rotor; heli.scale.setScalar(2.2); heli.frustumCulled = false;
+      scene.add(heli);
+    }
+    var h0 = Wd.hubs[0];
+    heli.from = { x: h0.x, z: h0.z + 400 }; heli.to = { x: x, z: z }; heli.t = 0; heli.visible = true;
+  };
+  function updateHeli(dt) {
+    if (!heli || !heli.visible) return;
+    heli.t += dt; heli.rotor.rotation.y += dt * 22;
+    var T1 = 7, T2 = 10, T3 = 17, f, a = heli.from, b = heli.to;
+    if (heli.t < T1) f = heli.t / T1; else if (heli.t < T2) f = 1; else if (heli.t < T3) f = 1 - (heli.t - T2) / (T3 - T2); else { heli.visible = false; return; }
+    f = f * f * (3 - 2 * f);
+    var x = a.x + (b.x - a.x) * f, z = a.z + (b.z - a.z) * f, hover = heli.t >= T1 && heli.t < T2;
+    heli.position.set(x, T.heightAt(x, z) + (hover ? 30 : 120 + 80 * Math.sin(f * 3.14)), z);
+    var back = heli.t >= T2 ? -1 : 1;
+    heli.rotation.y = Math.atan2(-(b.z - a.z) * back, (b.x - a.x) * back);
+  }
   Wd.frame = function (dt) {
+    updateHeli(dt);
     updateCamera(dt); updateLook(dt); Wd.updateLifts(SK.simDt || 0);
     renderer.render(scene, camera);
     updateLabels();

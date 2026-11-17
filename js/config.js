@@ -216,6 +216,13 @@ window.SK = window.SK || {};
       need: { visitors: 11000, open: 0.85, rep: 80 }, reward: 0 },
   ];
 
+  // What a mountain building can be
+  SK.HUTS = {
+    bar: { name: 'Umbrella bar', cost: 45000, spend: 7, stop: 0.34, desc: 'Schnapps and loud music at the piste edge. Many short stops.' },
+    lunch: { name: 'Mountain restaurant', cost: 95000, spend: 16, stop: 0.42, desc: 'Kaiserschmarrn on a sun terrace. Guests rate their day higher.' },
+    hotel: { name: 'Mountain hotel', cost: 420000, spend: 10, stop: 0.22, beds: 160, desc: '160 beds on the mountain: more guests, whatever the valley holds.' },
+  };
+
   SK.interp = function (curve, x) {
     if (x <= curve[0][0]) return curve[0][1];
     for (var i = 1; i < curve.length; i++) {

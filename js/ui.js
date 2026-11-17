@@ -63,6 +63,8 @@
     $('plan').addEventListener('click', onAct);
     $('controls').addEventListener('click', onAct);
     $('tray').addEventListener('click', function (e) {
+      var hb = e.target.closest('[data-hut]');
+      if (hb) { B.hutType = hb.dataset.hut; B.plan = null; B.pending = false; UI.refreshTools(); return; }
       var m = e.target.closest('[data-mode]');
       if (m) { B.route = m.dataset.mode === 'route'; B.pts = []; B.plan = null; B.redraw(); UI.refreshTools(); return; }
       var c = e.target.closest('.lcard'); if (!c || c.classList.contains('locked')) return;
@@ -90,6 +92,8 @@
     if (act === 'speed') { Sim.paused = d.v === '0'; if (!Sim.paused) Sim.speed = +d.v; UI.refreshControls(); return; }
     if (act === 'skip') { Sim.paused = false; Sim.speed = 40; UI.refreshControls(); return; }
     if (act === 'confirm') { B.confirm(); return; }
+    if (act === 'help') { UI.help = !UI.help; UI.renderSide(); return; }
+    if (act === 'event') { var res = Sim.resolveEvent(+d.i); $('eventcard').style.display = 'none'; if (res) UI.toast(res, ''); UI.refreshAll(); return; }
     if (act === 'zone-r') { B.zoneR = Math.max(100, Math.min(900, B.zoneR + (+d.n))); if (B.plan && B.plan.kind === 'zone') B.plan.r = B.zoneR; B.redraw(); UI.refreshPlan(); return; }
     if (act === 'export') {
       var txt = Sim.exportText(); if (!txt) { UI.toast('Nothing to export.', 'warn'); return; }
@@ -135,6 +139,8 @@
     else if (!o) return;
     else if (act === 'demolish') { var rf = Sim.remove(B.sel.kind, o); UI.toast('Removed' + (rf ? '. Scrap value ' + M(rf) + '.' : '.')); B.sel = null; B.redraw(); }
     else if (act === 'snow') err = Sim.toggleSnowmaking(o);
+    else if (act === 'lights') { err = Sim.toggleLights(o); if (!err) UI.toast(o.lights ? 'Floodlights up: night skiing on ' + o.name + '.' : 'Floodlights removed.', 'good'); }
+    else if (act === 'park') { err = Sim.togglePark(o); if (!err) UI.toast(o.park ? o.name + ' is now a fun park.' : 'Fun park removed.', 'good'); }
     else if (act === 'barrier') { err = Sim.buildBarrier(o); if (!err) UI.toast('Snow bridges built above ' + o.name + '.', 'good'); }
     else if (act === 'upgrade') { err = Sim.upgradeLift(o, d.type); if (!err) UI.toast(o.name + ' rebuilt as ' + SK.LIFT[d.type].name + '.', 'good'); B.redraw(); }
     else if (act === 'overhaul') { err = Sim.overhaul(o); if (!err) UI.toast(o.name + ' overhauled.', 'good'); }
@@ -227,6 +233,9 @@
       tray.innerHTML = '<button class="lcard mode ' + (!B.route ? 'on' : '') + '" data-mode="piste"><div class="n"><span class="dot" style="background:#2b7fd6"></span><span class="dot" style="background:#dc3b34"></span><span class="dot" style="background:#22262b"></span>Groomed piste</div><div class="m">Cleared, marked, groomed. Colour set by the gradient.</div></button>' +
         '<button class="lcard mode ' + (B.route ? 'on' : '') + '" data-mode="route"><div class="n"><span class="dot" style="background:#f08a1c;border-radius:2px;transform:rotate(45deg)"></span>Ski route</div><div class="m">Marked but ungroomed. Cheap, experts only, needs deep natural snow.</div></button>';
       tray.style.display = 'flex';
+    } else if (B.tool === 'hut') {
+      tray.innerHTML = Object.keys(SK.HUTS).map(function (k) { var t = SK.HUTS[k]; return '<button class="lcard mode ' + ((B.hutType || 'lunch') === k ? 'on' : '') + '" data-hut="' + k + '"><div class="n">' + t.name + '</div><div class="m">' + t.desc + '</div><div class="p">from ' + M(Math.round(t.cost * (0.5 + 0.5 * Sim.era()) / 1000) * 1000) + '</div></button>'; }).join('');
+      tray.style.display = 'flex';
     } else tray.style.display = 'none';
     UI.refreshPlan();
   };
@@ -257,7 +266,7 @@
         h += '<div class="acts"><button class="btn dark" data-act="finish"' + (B.pts.length < 2 ? ' disabled' : '') + '>Build</button><button class="btn" data-act="undo">Undo point</button><button class="btn" data-act="cancel">Cancel</button></div>';
       }
     } else if (B.tool === 'hut') {
-      h = '<h4>Mountain hut</h4>' + (pl && pl.kind === 'hut' ? '<div class="row"><span>Cost <b>' + M(pl.cost) + '</b></span><span>Build <b>3 wk</b></span><span>Earns about <b>€3.40</b> per guest it can serve (700 a day)</span></div>' +
+      h = '<h4>' + SK.HUTS[B.hutType || 'lunch'].name + '</h4>' + (pl && pl.kind === 'hut' ? '<div class="row"><span>Cost <b>' + M(pl.cost) + '</b></span><span>Build <b>3 wk</b></span><span>' + SK.HUTS[B.hutType || 'lunch'].desc + '</span></div>' +
         (pl.error ? '<div class="err">' + pl.error + '</div>' : (B.pending ? '' : '<div class="ok">Click to build.</div>')) + go : '<div class="hint">Place it on flat ground next to a piste. Guests are a little happier, and hungrier.</div>');
     } else if (B.tool === 'zone') {
       h = '<h4>No-go zone</h4><div class="hint">Mark an area nobody may enter: pistes and routes through it close, and freeriders stay off the slope. Red rings show avalanche slopes freeriders can reach from your lifts. ' + G.zones.length + ' / ' + T.MAXZONES + ' zones.</div><div class="acts"><span class="lbl">Size ' + B.zoneR + ' m</span><button class="btn" data-act="zone-r" data-n="-60">Smaller</button><button class="btn" data-act="zone-r" data-n="60">Bigger</button></div>' + go;
@@ -312,6 +321,8 @@
       if (summer) {
         if (!route) h += G.tech.snow1 ? '<button class="btn" data-act="snow">' + (o.snowmaking ? 'Remove snowmaking' : 'Snowmaking · ' + M(Sim.snowmakingCost(o))) + '</button>' : '<button class="btn" disabled>Snowmaking: from 1975</button>';
         if (o.expo > 0.12 && !o.barrier) h += '<button class="btn" data-act="barrier">Snow bridges · ' + M(Sim.barrierCost(o)) + '</button>';
+        if (!route) h += '<button class="btn" data-act="lights">' + (o.lights ? 'Remove floodlights' : 'Night skiing · ' + M(Sim.lightsCost(o))) + '</button>';
+        if (o.diff === 'blue' || o.diff === 'red') h += '<button class="btn" data-act="park">' + (o.park ? 'Remove fun park' : 'Fun park · ' + M(Sim.parkCost())) + '</button>';
         h += '<button class="btn red" data-act="demolish">Remove</button>';
       }
       h += '</div>';
@@ -355,7 +366,7 @@
       h += '<h5>Before the snow comes</h5>';
       issues.slice(0, 6).forEach(function (is) { h += '<div class="warnbox" ' + (is.x !== undefined ? 'data-act="fly" data-x="' + is.x + '" data-z="' + is.z + '"' : '') + '>' + esc(is.t) + '</div>'; });
     }
-    if (!G.lifts.length) {
+    if (UI.help) {
       h += '<h5>Getting started</h5><p><b>1.</b> Pick <b>Lift</b> and build a T-bar from a village (yellow circle) up the hillside. St. Anton is the biggest; Lech, Zürs, Stuben, Warth and Schröcken are yours too.</p><p><b>2.</b> Pick <b>Piste</b>, start at the top station and draw back down into the village.</p><p><b>3.</b> Hire a mechanic and a piste crew under <b>Team</b>, run a poster campaign under <b>Market</b>, then open the winter.</p>';
     }
     var done = SK.GOALS.filter(function (g) { return G.goals[g.id]; });
@@ -363,7 +374,7 @@
       h += '<h5>Chapters</h5>';
       done.forEach(function (g) { h += '<div class="item"><div class="tx"><b>' + g.title + '</b><small>by ' + (g.by + 1) + '</small></div><span class="tag ' + (G.goals[g.id] === 'done' ? 'good">achieved' : 'bad">missed') + '</span></div>'; });
     }
-    h += '<h5>Controls</h5><p>Mouse: drag to move · right-drag to rotate · wheel to zoom. Touch: one finger moves, pinch zooms, twist rotates, two fingers up/down tilt, long-press undoes.</p><button class="btn" data-act="newgame">New game…</button>' +
+    h += '<h5>Controls</h5><p>Mouse: drag to move · right-drag to rotate · wheel to zoom. Touch: one finger moves, pinch zooms, twist rotates, two fingers up/down tilt, long-press undoes.</p><button class="btn" data-act="help">' + (UI.help ? 'Hide tips' : 'Show tips') + '</button> <button class="btn" data-act="newgame">New game…</button>' +
       '<h5>Save file</h5><div style="display:flex;gap:6px"><button class="btn" data-act="export">Export game</button><button class="btn" data-act="import">Import game</button></div>' +
       '<h5>Free play</h5><p>Skip ahead to try later technology. Goals still run, but this is no longer a fair story game.</p><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-act="jump" data-n="1">+1 year</button><button class="btn" data-act="jump" data-n="10">+10 years</button><button class="btn" data-act="jump" data-n="40">+40 years</button><button class="btn" data-act="cash">+ €10M</button></div>';
     return h;
@@ -534,6 +545,16 @@
     });
   };
 
+  // a winter decision: a small card, the season waits for your answer
+  UI.showEvent = function (ev) {
+    var el = $('eventcard');
+    if (!el) { el = document.createElement('div'); el.id = 'eventcard'; el.className = 'card'; el.style.cssText = 'padding:12px 16px;max-width:560px;border-left:5px solid var(--accent)'; $('bottom').insertBefore(el, $('bottom').firstChild); el.addEventListener('click', onAct); }
+    el.innerHTML = '<div style="font-size:10.5px;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)">Your call</div><h4 style="margin:2px 0 4px;font-size:15px">' + esc(ev.title) + '</h4><div style="color:var(--ink2)">' + esc(ev.text) + '</div>' +
+      '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">' + ev.opts.map(function (o, i) { return '<button class="btn ' + (i ? '' : 'dark') + '" data-act="event" data-i="' + i + '">' + esc(o.label) + '</button>'; }).join('') + '</div>';
+    el.style.display = 'block';
+    if (ev.x !== undefined) Wd.flyTo(ev.x, ev.z, Math.min(Wd.camGoal.dist, 2600));
+  };
+
   UI.showIntro = function () {
     var btns = [{ label: 'New game', fn: function () { SK.startNew(); } }];
     if (Sim.hasSave()) btns = [{ label: 'New game', cls: 'ghost', fn: function () { SK.startNew(); } }, { label: 'Continue', fn: function () { SK.continueGame(); } }];
@@ -555,7 +576,7 @@
     if (!G.lifts.length || !G.pistes.length) {
       UI.modal('<div class="eyebrow">Not ready</div><h1>Open with ' + (!G.lifts.length ? 'no lifts' : 'no pistes') + '?</h1><p>Without a lift from a village and a piste back down nobody will come this winter - but the year will pass all the same.</p>',
         [{ label: 'Keep building', cls: 'ghost' }, { label: 'Open anyway', fn: go }]);
-    } else if (issues.length || warn.length) {
+    } else if (UI.help && (issues.length || warn.length)) {
       UI.modal('<div class="eyebrow">Before you open</div><h1>' + (issues.length + warn.length) + ' thing' + (issues.length + warn.length > 1 ? 's' : '') + ' to check</h1><ul>' + issues.slice(0, 4).map(function (i) { return '<li>' + esc(i.t) + '</li>'; }).concat(warn.map(function (w) { return '<li>' + w + '</li>'; })).join('') + '</ul>',
         [{ label: 'Keep building', cls: 'ghost' }, { label: 'Open anyway', fn: go }]);
     } else go();
